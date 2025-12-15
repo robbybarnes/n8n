@@ -1,0 +1,831 @@
+{
+  "name": "Notion-Todoist Bidirectional Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Run Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Manual Trigger (Live)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 500]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-0001-0001-000000000030",
+      "name": "Dry Run (Preview Only)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 700]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mode-live-1",
+              "name": "dryRun",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000031",
+      "name": "Set Live Mode",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mode-dry-1",
+              "name": "dryRun",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000032",
+      "name": "Set Dry Run Mode",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 700]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "11c3f70913a98025b03cd901c80f83dc",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Get All Notion Tasks",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [460, 300],
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter tasks assigned to Robby and extract relevant properties\nconst items = $input.all();\nconst results = [];\n\n// Get dryRun flag from the first item (set by trigger)\nconst dryRun = items.length > 0 && items[0].json.dryRun === true;\n\nfor (const item of items) {\n  const page = item.json;\n  \n  // Skip items without an id (mode-setting items)\n  if (!page.id) continue;\n  \n  // Get title - n8n flattens to property_name\n  const title = page.property_name || page.Name || '';\n  \n  // Get status - n8n flattens to property_status\n  const status = page.property_status || '';\n  \n  // Get Todoist ID - check multiple possible field names\n  const todoistId = page.property_todoist_id || page['property_Todoist ID'] || '';\n  \n  // Check if assigned to Robby\n  let isAssignedToRobby = false;\n  \n  // Method 1: Check if property_assigned_to is an array\n  if (Array.isArray(page.property_assigned_to)) {\n    for (const assignee of page.property_assigned_to) {\n      if (assignee && typeof assignee === 'string' && assignee.toLowerCase().includes('robby')) {\n        isAssignedToRobby = true;\n        break;\n      }\n    }\n  }\n  \n  // Method 2: Check indexed keys like property_assigned_to[0]\n  if (!isAssignedToRobby) {\n    for (const key of Object.keys(page)) {\n      if (key.match(/property_assigned_to\\[\\d+\\]/)) {\n        const value = page[key];\n        if (value && typeof value === 'string' && value.toLowerCase().includes('robby')) {\n          isAssignedToRobby = true;\n          break;\n        }\n      }\n    }\n  }\n  \n  // Method 3: Deep search all keys containing 'assigned'\n  if (!isAssignedToRobby) {\n    const pageStr = JSON.stringify(page).toLowerCase();\n    if (pageStr.includes('assigned') && pageStr.includes('robby')) {\n      isAssignedToRobby = true;\n    }\n  }\n  \n  // Only include tasks assigned to Robby\n  if (isAssignedToRobby) {\n    results.push({\n      json: {\n        notionId: page.id,\n        notionUrl: page.url,\n        title: title,\n        status: status,\n        todoistId: todoistId,\n        lastEdited: page.last_edited_time,\n        dryRun: dryRun\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000004",
+      "name": "Filter & Extract Notion Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "operation": "getAll",
+        "returnAll": true,
+        "filters": {
+          "projectId": "6cJcgXJ5v2GqhR4c"
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000005",
+      "name": "Get Todoist Work Tasks",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2,
+      "position": [460, 500],
+      "credentials": {
+        "todoistApi": {
+          "id": "",
+          "name": "Todoist account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract Todoist tasks and find NotionID links in descriptions\n// Preserve dryRun mode from input\nconst items = $input.all();\nconst results = [];\n\n// Get dryRun flag from the first item\nconst dryRun = items.length > 0 && items[0].json.dryRun === true;\n\nfor (const item of items) {\n  const task = item.json;\n  \n  // Skip mode-setting items\n  if (task.dryRun !== undefined && !task.id) continue;\n  \n  // Extract NotionID from description if present\n  let linkedNotionId = '';\n  const description = task.description || '';\n  const notionIdMatch = description.match(/\\[NotionID:([a-f0-9-]+)\\]/i);\n  if (notionIdMatch) {\n    linkedNotionId = notionIdMatch[1];\n  }\n  \n  results.push({\n    json: {\n      todoistId: task.id,\n      content: task.content,\n      description: description,\n      isCompleted: task.is_completed || false,\n      linkedNotionId: linkedNotionId,\n      projectId: task.project_id,\n      dryRun: dryRun\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000006",
+      "name": "Extract Todoist Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 500]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000007",
+      "name": "Combine All Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [940, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine sync actions for each Notion task\nconst allItems = $input.all();\n\n// Check if this is a dry run\nlet dryRun = false;\nfor (const item of allItems) {\n  if (item.json.dryRun === true) {\n    dryRun = true;\n    break;\n  }\n}\n\n// Separate Notion tasks and Todoist tasks\nconst notionTasks = [];\nconst todoistTasks = [];\n\nfor (const item of allItems) {\n  const data = item.json;\n  if (data.notionId) {\n    notionTasks.push(data);\n  }\n  if (data.todoistId && data.projectId) {\n    todoistTasks.push(data);\n  }\n}\n\n// Create lookup maps\nconst todoistByNotionId = {};\nconst todoistById = {};\n\nfor (const t of todoistTasks) {\n  if (t.linkedNotionId) {\n    todoistByNotionId[t.linkedNotionId] = t;\n  }\n  todoistById[t.todoistId] = t;\n}\n\n// Status mapping\nconst activeStatuses = ['Not Started', 'In Progress'];\nconst deleteStatuses = ['On Hold', 'Abandoned or Not Applicable'];\nconst doneStatus = 'Done';\n\nconst results = [];\n\n// Process each Notion task\nfor (const notion of notionTasks) {\n  // Find linked Todoist task\n  let linkedTodoist = null;\n  \n  if (notion.todoistId && todoistById[notion.todoistId]) {\n    linkedTodoist = todoistById[notion.todoistId];\n  } else {\n    linkedTodoist = todoistByNotionId[notion.notionId] || null;\n  }\n  \n  let action = 'none';\n  let targetTodoistId = notion.todoistId || (linkedTodoist ? linkedTodoist.todoistId : null);\n  \n  if (!linkedTodoist && !notion.todoistId) {\n    if (activeStatuses.includes(notion.status)) {\n      action = 'create_in_todoist';\n    }\n  } else if (linkedTodoist || notion.todoistId) {\n    const todoistCompleted = linkedTodoist ? linkedTodoist.isCompleted : false;\n    \n    if (deleteStatuses.includes(notion.status)) {\n      if (targetTodoistId) {\n        action = 'delete_from_todoist';\n      }\n    } else if (notion.status === doneStatus && !todoistCompleted) {\n      action = 'close_todoist';\n    } else if (activeStatuses.includes(notion.status) && todoistCompleted) {\n      action = 'mark_notion_done';\n    } else if (activeStatuses.includes(notion.status) && !todoistCompleted && linkedTodoist) {\n      if (notion.title !== linkedTodoist.content) {\n        action = 'update_todoist_title';\n      }\n    }\n  }\n  \n  if (action !== 'none') {\n    results.push({\n      json: {\n        action: action,\n        notionId: notion.notionId,\n        notionTitle: notion.title,\n        notionStatus: notion.status,\n        notionUrl: notion.notionUrl,\n        todoistId: targetTodoistId,\n        todoistDescription: linkedTodoist ? linkedTodoist.description : '',\n        dryRun: dryRun\n      }\n    });\n  }\n}\n\n// Check for Todoist tasks completed but not linked\nfor (const todoist of todoistTasks) {\n  if (todoist.linkedNotionId && todoist.isCompleted) {\n    const linkedNotion = notionTasks.find(n => n.notionId === todoist.linkedNotionId);\n    if (linkedNotion && activeStatuses.includes(linkedNotion.status)) {\n      const alreadyAdded = results.some(r => \n        r.json.action === 'mark_notion_done' && r.json.notionId === todoist.linkedNotionId\n      );\n      if (!alreadyAdded) {\n        results.push({\n          json: {\n            action: 'mark_notion_done',\n            notionId: todoist.linkedNotionId,\n            notionTitle: linkedNotion.title,\n            notionStatus: linkedNotion.status,\n            notionUrl: linkedNotion.notionUrl,\n            todoistId: todoist.todoistId,\n            todoistDescription: todoist.description,\n            dryRun: dryRun\n          }\n        });\n      }\n    }\n  }\n}\n\nreturn results.length > 0 ? results : [{ json: { action: 'none', message: 'No sync actions needed', dryRun: dryRun } }];"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000008",
+      "name": "Determine Sync Actions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1180, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-dryrun-check",
+              "leftValue": "={{ $json.dryRun }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000033",
+      "name": "Is Dry Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1400, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate a preview summary of all planned actions\nconst items = $input.all();\n\nconst actionDescriptions = {\n  'create_in_todoist': '➕ CREATE in Todoist',\n  'close_todoist': '✅ CLOSE in Todoist (mark complete)',\n  'delete_from_todoist': '🗑️ DELETE from Todoist',\n  'mark_notion_done': '✓ MARK DONE in Notion',\n  'update_todoist_title': '📝 UPDATE title in Todoist',\n  'none': '⏸️ No action needed'\n};\n\nconst summary = {\n  mode: '🔍 DRY RUN - NO CHANGES MADE',\n  totalActions: 0,\n  actions: [],\n  byType: {\n    create_in_todoist: [],\n    close_todoist: [],\n    delete_from_todoist: [],\n    mark_notion_done: [],\n    update_todoist_title: []\n  }\n};\n\nfor (const item of items) {\n  const data = item.json;\n  \n  if (data.action === 'none') {\n    continue;\n  }\n  \n  summary.totalActions++;\n  \n  const actionDetail = {\n    action: actionDescriptions[data.action] || data.action,\n    task: data.notionTitle,\n    notionStatus: data.notionStatus,\n    notionId: data.notionId,\n    todoistId: data.todoistId || '(will be created)',\n    notionUrl: data.notionUrl\n  };\n  \n  summary.actions.push(actionDetail);\n  \n  if (summary.byType[data.action]) {\n    summary.byType[data.action].push(data.notionTitle);\n  }\n}\n\n// Build readable summary\nlet readableSummary = `\\n========================================\\n🔍 DRY RUN PREVIEW - NO CHANGES MADE\\n========================================\\n\\n`;\n\nif (summary.totalActions === 0) {\n  readableSummary += '✨ No sync actions needed! Everything is already in sync.\\n';\n} else {\n  readableSummary += `📊 Total actions that WOULD be taken: ${summary.totalActions}\\n\\n`;\n  \n  // Group by action type\n  if (summary.byType.create_in_todoist.length > 0) {\n    readableSummary += `➕ WOULD CREATE in Todoist (${summary.byType.create_in_todoist.length}):\\n`;\n    for (const title of summary.byType.create_in_todoist) {\n      readableSummary += `   • ${title}\\n`;\n    }\n    readableSummary += '\\n';\n  }\n  \n  if (summary.byType.close_todoist.length > 0) {\n    readableSummary += `✅ WOULD CLOSE in Todoist (${summary.byType.close_todoist.length}):\\n`;\n    for (const title of summary.byType.close_todoist) {\n      readableSummary += `   • ${title}\\n`;\n    }\n    readableSummary += '\\n';\n  }\n  \n  if (summary.byType.delete_from_todoist.length > 0) {\n    readableSummary += `🗑️ WOULD DELETE from Todoist (${summary.byType.delete_from_todoist.length}):\\n`;\n    for (const title of summary.byType.delete_from_todoist) {\n      readableSummary += `   • ${title}\\n`;\n    }\n    readableSummary += '\\n';\n  }\n  \n  if (summary.byType.mark_notion_done.length > 0) {\n    readableSummary += `✓ WOULD MARK DONE in Notion (${summary.byType.mark_notion_done.length}):\\n`;\n    for (const title of summary.byType.mark_notion_done) {\n      readableSummary += `   • ${title}\\n`;\n    }\n    readableSummary += '\\n';\n  }\n  \n  if (summary.byType.update_todoist_title.length > 0) {\n    readableSummary += `📝 WOULD UPDATE title in Todoist (${summary.byType.update_todoist_title.length}):\\n`;\n    for (const title of summary.byType.update_todoist_title) {\n      readableSummary += `   • ${title}\\n`;\n    }\n    readableSummary += '\\n';\n  }\n}\n\nreadableSummary += `========================================\\n💡 To execute these changes, use \"Manual Trigger (Live)\"\\n========================================`;\n\nreturn [{\n  json: {\n    ...summary,\n    readableSummary: readableSummary\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000034",
+      "name": "Preview Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-action-check",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "none",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000009",
+      "name": "Has Actions?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1640, 500]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "create_in_todoist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Create"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "close_todoist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Close"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "delete_from_todoist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Delete"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "mark_notion_done",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "MarkDone"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "update_todoist_title",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Update"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000010",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1880, 440]
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "operation": "create",
+        "project": {
+          "__rl": true,
+          "value": "6cJcgXJ5v2GqhR4c",
+          "mode": "id"
+        },
+        "content": "={{ $json.notionTitle }}",
+        "additionalFields": {
+          "description": "Synced from Notion\n[NotionID:{{ $json.notionId }}]\n\nNotion URL: {{ $json.notionUrl }}"
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000011",
+      "name": "Create Task in Todoist",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2,
+      "position": [2140, 180],
+      "credentials": {
+        "todoistApi": {
+          "id": "",
+          "name": "Todoist account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare data for updating Notion with new Todoist ID\nconst todoistTask = $json;\nconst previousData = $('Route by Action').item.json;\n\nreturn [{\n  json: {\n    notionId: previousData.notionId,\n    newTodoistId: todoistTask.id\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000012",
+      "name": "Prepare Notion Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2360, 180]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.notionId }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Todoist ID|rich_text",
+              "textValue": "={{ $json.newTodoistId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000013",
+      "name": "Store Todoist ID in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2580, 180],
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "operation": "close",
+        "taskId": "={{ $json.todoistId }}"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000014",
+      "name": "Close Task in Todoist",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2,
+      "position": [2140, 340],
+      "credentials": {
+        "todoistApi": {
+          "id": "",
+          "name": "Todoist account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "operation": "delete",
+        "taskId": "={{ $json.todoistId }}"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000015",
+      "name": "Delete Task from Todoist",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2,
+      "position": [2140, 500],
+      "credentials": {
+        "todoistApi": {
+          "id": "",
+          "name": "Todoist account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.notionId }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Todoist ID|rich_text",
+              "textValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000016",
+      "name": "Clear Todoist ID in Notion",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2360, 500],
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.notionId }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|status",
+              "statusValue": "Done"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000017",
+      "name": "Mark Notion Task Done",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2140, 660],
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "task",
+        "operation": "update",
+        "taskId": "={{ $json.todoistId }}",
+        "updateFields": {
+          "content": "={{ $json.notionTitle }}"
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000018",
+      "name": "Update Todoist Title",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2,
+      "position": [2140, 820],
+      "credentials": {
+        "todoistApi": {
+          "id": "",
+          "name": "Todoist account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Notion-Todoist Bidirectional Sync\n\n**Purpose:** Sync tasks between your Notion Tasks database and Todoist Work project.\n\n### Status Mapping\n| Notion Status | Todoist Action |\n|---------------|----------------|\n| Not Started | Create/Keep open task |\n| In Progress | Create/Keep open task |\n| On Hold | Delete from Todoist |\n| Abandoned or Not Applicable | Delete from Todoist |\n| Done | Mark completed in Todoist |\n\n### Bidirectional Sync\n- **Notion → Todoist:** When you create/update tasks in Notion\n- **Todoist → Notion:** When you complete tasks in Todoist\n\n### Deduplication\n- Notion stores Todoist task ID in `Todoist ID` property\n- Todoist stores Notion page ID in description as `[NotionID:xxx]`",
+        "height": 420,
+        "width": 380
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000019",
+      "name": "Workflow Info",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 60]
+    },
+    {
+      "parameters": {
+        "content": "## How to Use\n\n### 🔍 Dry Run (Preview Only)\nUse this trigger FIRST to see what changes would be made without actually making them.\n\n### ▶️ Manual Trigger (Live)\nExecutes the sync and makes real changes to Notion and Todoist.\n\n### ⏰ Run Every 5 Minutes\nAutomatic sync when workflow is activated.\n\n---\n\n### Property Names (Case-Sensitive)\n- `Name` - Task title\n- `Status` - Task status\n- `Assigned to` - People field\n- `Todoist ID` - Link storage",
+        "height": 380,
+        "width": 380
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000020",
+      "name": "How to Use",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 500]
+    },
+    {
+      "parameters": {
+        "content": "## 🔍 DRY RUN PATH\nThis branch shows what WOULD happen without making changes.\n\nCheck the output of \"Preview Summary\" to see planned actions.",
+        "height": 120,
+        "width": 300
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000035",
+      "name": "Dry Run Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1620, 160]
+    },
+    {
+      "parameters": {
+        "content": "## ▶️ LIVE EXECUTION PATH\nThis branch makes real changes to Notion and Todoist.",
+        "height": 100,
+        "width": 300
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000036",
+      "name": "Live Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1860, 320]
+    }
+  ],
+  "connections": {
+    "Run Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Set Live Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger (Live)": {
+      "main": [
+        [
+          {
+            "node": "Set Live Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dry Run (Preview Only)": {
+      "main": [
+        [
+          {
+            "node": "Set Dry Run Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Live Mode": {
+      "main": [
+        [
+          {
+            "node": "Get All Notion Tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Todoist Work Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Dry Run Mode": {
+      "main": [
+        [
+          {
+            "node": "Get All Notion Tasks",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Todoist Work Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Notion Tasks": {
+      "main": [
+        [
+          {
+            "node": "Filter & Extract Notion Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Extract Notion Data": {
+      "main": [
+        [
+          {
+            "node": "Combine All Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Todoist Work Tasks": {
+      "main": [
+        [
+          {
+            "node": "Extract Todoist Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Todoist Data": {
+      "main": [
+        [
+          {
+            "node": "Combine All Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine All Data": {
+      "main": [
+        [
+          {
+            "node": "Determine Sync Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Sync Actions": {
+      "main": [
+        [
+          {
+            "node": "Is Dry Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Dry Run?": {
+      "main": [
+        [
+          {
+            "node": "Preview Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Actions?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Actions?": {
+      "main": [
+        [
+          {
+            "node": "Route by Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Route by Action": {
+      "main": [
+        [
+          {
+            "node": "Create Task in Todoist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Close Task in Todoist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Task from Todoist",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Notion Task Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Todoist Title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Task in Todoist": {
+      "main": [
+        [
+          {
+            "node": "Prepare Notion Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Notion Update": {
+      "main": [
+        [
+          {
+            "node": "Store Todoist ID in Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Task from Todoist": {
+      "main": [
+        [
+          {
+            "node": "Clear Todoist ID in Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

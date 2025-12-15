@@ -1,5 +1,41 @@
 # n8n Automation Project
 
+This repository contains n8n workflow automations built with AI assistance. Workflows are stored as JSON files and can be deployed directly to the connected n8n instance.
+
+## Workflow Repository
+
+### Current Workflows
+
+| File | Name | Description | n8n ID | Status |
+|------|------|-------------|--------|--------|
+| `notion-todoist-bidirectional-sync.json` | Notion-Todoist Sync | Bidirectional task sync between Notion Tasks database and Todoist Work project | `6qdUqbQ25uHzfSYe` | In Development |
+
+### Workflow File Conventions
+
+- **Naming**: `kebab-case-description.json`
+- **Documentation**: Include sticky notes in workflow explaining purpose, setup, and mappings
+- **Dry Run**: When possible, include a "Dry Run" trigger for safe testing
+- **Credentials**: Use placeholder credential names; actual credentials are configured in n8n
+
+### Deploying Workflows
+
+To deploy or update a workflow:
+```python
+# Via Python (when curl has issues)
+python3 -c "
+import json, urllib.request
+with open('workflow-file.json', 'r') as f:
+    workflow = json.load(f)
+url = 'https://n8n-instance/api/v1/workflows/WORKFLOW_ID'
+req = urllib.request.Request(url, json.dumps(workflow).encode(), method='PUT')
+req.add_header('X-N8N-API-KEY', 'api-key')
+req.add_header('Content-Type', 'application/json')
+urllib.request.urlopen(req)
+"
+```
+
+---
+
 ## MCP Server Setup
 
 This project uses the following MCP servers:
@@ -24,7 +60,7 @@ All MCP server credentials are stored directly in `.mcp.json` (gitignored for se
 
 To update API keys, edit `.mcp.json` directly:
 - `n8n-mcp`: Update `N8N_API_URL` and `N8N_API_KEY` in the env section
-- `notion`: Update the `Authorization` header with your `ntn_*` token
+- `notion`: Update `NOTION_TOKEN` with your `ntn_*` integration token
 
 ---
 
@@ -330,3 +366,48 @@ Use the same four-parameter format:
 20. **n8n-nodes-base.executeWorkflowTrigger** - Sub-workflow calls
 
 **Note:** LangChain nodes use the `@n8n/n8n-nodes-langchain.` prefix, core nodes use `n8n-nodes-base.`
+
+---
+
+## n8n Node Data Structure Notes
+
+### Notion Node - Flattened Property Format
+
+When using the Notion node to get database pages, n8n **flattens** the Notion API response. Properties are NOT in the nested format from the Notion API.
+
+**Notion API returns:**
+```json
+{
+  "properties": {
+    "Status": { "status": { "name": "Done" } },
+    "Assigned to": { "people": [{ "name": "Robby", "person": { "email": "robby@example.com" } }] }
+  }
+}
+```
+
+**n8n Notion node returns (flattened):**
+```json
+{
+  "id": "page-id",
+  "property_status": "Done",
+  "property_assigned_to": ["robby@example.com"],
+  "property_name": "Task Title"
+}
+```
+
+**Key differences:**
+- Properties are prefixed with `property_`
+- Nested values are flattened (status name becomes string, people become email array)
+- Array properties like `property_assigned_to` may contain emails, not full person objects
+- Property names are lowercased and spaces replaced with underscores
+
+**Code pattern for checking assigned users:**
+```javascript
+// Check all property_assigned_to entries for a match
+let isAssigned = false;
+if (Array.isArray(page.property_assigned_to)) {
+  isAssigned = page.property_assigned_to.some(a =>
+    a && a.toLowerCase().includes('robby')
+  );
+}
+```

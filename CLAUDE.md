@@ -2,32 +2,29 @@
 
 ## MCP Server Setup
 
-This project uses the [n8n-mcp](https://github.com/czlonkowski/n8n-mcp) server for workflow automation capabilities.
+This project uses the following MCP servers:
 
-### Environment Setup
+1. **[n8n-mcp](https://github.com/czlonkowski/n8n-mcp)** - Workflow automation capabilities
+2. **[Notion MCP](https://developers.notion.com/docs/mcp)** - Notion workspace integration
 
-Before starting Claude Code, load the environment variables from `.env`:
+### Configuration
 
-```bash
-# Option 1: One-time load for current session
-export $(cat .env | xargs) && claude
+All MCP server credentials are stored directly in `.mcp.json` (gitignored for security).
 
-# Option 2: Add to your shell profile (~/.zshrc or ~/.bashrc) for automatic loading
-set -a
-source ~/GitHub/n8n/.env
-set +a
-```
-
-### Required Environment Variables
-
-The `.env` file should contain:
-- `N8N_API_URL` - Your n8n instance URL
-- `N8N_API_KEY` - Your n8n API key
+**No additional setup required** - just start Claude Code in this directory and the MCP servers will be available.
 
 ### Configuration Files
 
-- `.mcp.json` - MCP server configuration (safe to commit, uses variable references)
-- `.env` - Secrets file (gitignored, never commit)
+| File | Contents | Git Status |
+|------|----------|------------|
+| `.mcp.json` | MCP server config with credentials | **Gitignored** (contains secrets) |
+| `.env` | Backup/reference secrets | **Gitignored** |
+
+### Updating Credentials
+
+To update API keys, edit `.mcp.json` directly:
+- `n8n-mcp`: Update `N8N_API_URL` and `N8N_API_KEY` in the env section
+- `notion`: Update the `Authorization` header with your `ntn_*` token
 
 ---
 

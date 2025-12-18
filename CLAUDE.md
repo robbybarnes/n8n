@@ -9,6 +9,8 @@ This repository contains n8n workflow automations built with AI assistance. Work
 | File | Name | Description | n8n ID | Status |
 |------|------|-------------|--------|--------|
 | `notion-todoist-bidirectional-sync.json` | Notion-Todoist Sync | Bidirectional task sync between Notion Tasks database and Todoist Work project | `6qdUqbQ25uHzfSYe` | In Development |
+| `zendesk-ai-priority-classifier.json` | Zendesk AI Priority Classifier | (Webhook-based - deprecated due to Cloud Run issues) | `Nz94C0WkZdA8YhE8` | Deprecated |
+| `zendesk-ai-priority-classifier-polling.json` | Zendesk AI Priority Classifier (Polling) | Polls every 2 min for new tickets, classifies priority with Claude Sonnet 4.5, updates priority field and adds internal note | `EuufrUixOtDlA55c` | Active |
 
 ### Workflow File Conventions
 

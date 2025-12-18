@@ -1,0 +1,158 @@
+{
+  "name": "Zendesk AI Priority Classifier (Polling)",
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "name": "Check Every 2 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "minutes", "minutesInterval": 2}]
+        }
+      }
+    },
+    {
+      "id": "get-new-tickets",
+      "name": "Get New Tickets",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "ticketType": "regular",
+        "returnAll": false,
+        "limit": 50,
+        "options": {
+          "status": "new",
+          "sortBy": "created_at",
+          "sortOrder": "desc"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {"id": "zendesk", "name": "Zendesk account"}
+      }
+    },
+    {
+      "id": "filter-unprocessed",
+      "name": "Not Yet Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-tag",
+              "leftValue": "={{ !$json.tags.includes('ai-priority-set') }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "anthropic-model",
+      "name": "Claude Sonnet 4.5",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [660, 200],
+      "parameters": {
+        "model": {"mode": "id", "value": "claude-sonnet-4-5-20250929"}
+      },
+      "credentials": {
+        "anthropicApi": {"id": "anthropic", "name": "Anthropic account"}
+      }
+    },
+    {
+      "id": "information-extractor",
+      "name": "Classify Priority",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [660, 0],
+      "parameters": {
+        "text": "={{ $json.subject }}: {{ $json.description }}",
+        "schemaType": "fromAttributes",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "priority",
+              "type": "string",
+              "description": "The priority level. MUST be exactly one of these lowercase values: low, normal, high, urgent. Use the criteria: urgent=system down/security/data loss/revenue impact, high=major feature broken/workflow blocked, normal=issue with workaround/general questions, low=cosmetic issues/feature requests",
+              "required": true
+            },
+            {
+              "name": "explanation",
+              "type": "string",
+              "description": "A brief 1-2 sentence explanation of why this priority level was assigned, suitable for an internal support note",
+              "required": true
+            }
+          ]
+        },
+        "options": {
+          "systemPromptTemplate": "You are a support ticket priority classifier. Analyze the ticket content and determine the appropriate priority level.\n\nPriority Guidelines:\n- URGENT: System completely down, security breach, data loss risk, significant revenue impact, or many users affected simultaneously\n- HIGH: Major feature not working, significant workflow blocked, time-sensitive business deadline affected\n- NORMAL: Feature issue but workaround exists, general questions, moderate business impact\n- LOW: Minor cosmetic issues, feature requests, documentation questions, nice-to-have improvements\n\nAlways respond with the priority in lowercase (low, normal, high, urgent) and provide a clear, professional explanation."
+        }
+      }
+    },
+    {
+      "id": "zendesk-update",
+      "name": "Update Ticket Priority",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [880, 0],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $('Get New Tickets').item.json.id }}",
+        "jsonParameters": true,
+        "updateFieldsJson": "={{ JSON.stringify({ priority: $json.output.priority, tags: $('Get New Tickets').item.json.tags.concat(['ai-priority-set']), comment: { body: '🤖 AI Priority Assessment:\\n\\n' + $json.output.explanation + '\\n\\n---\\nPriority automatically set to: ' + $json.output.priority.toUpperCase(), public: false } }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {"id": "zendesk", "name": "Zendesk account"}
+      }
+    },
+    {
+      "id": "sticky-note",
+      "name": "Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-200, -150],
+      "parameters": {
+        "content": "## Zendesk AI Priority Classifier (Polling)\n\n**Purpose**: Automatically classify new Zendesk tickets by priority using Claude Sonnet 4.5\n\n**How it works**:\n1. Runs every 2 minutes to check for new tickets\n2. Filters tickets that don't have the 'ai-priority-set' tag\n3. Sends ticket subject + description to Claude for analysis\n4. Updates the ticket's priority field, adds the tag, and adds an internal note\n\n**Why polling?**: More reliable than webhooks on Cloud Run (no ephemeral instance issues)\n\n**Priority Guidelines**:\n- **Urgent**: System down, security breach, data loss, revenue impact\n- **High**: Major feature broken, workflow blocked\n- **Normal**: Issue with workaround, general questions\n- **Low**: Cosmetic issues, feature requests"
+      }
+    }
+  ],
+  "connections": {
+    "Check Every 2 Minutes": {
+      "main": [[{"node": "Get New Tickets", "type": "main", "index": 0}]]
+    },
+    "Get New Tickets": {
+      "main": [[{"node": "Not Yet Processed?", "type": "main", "index": 0}]]
+    },
+    "Not Yet Processed?": {
+      "main": [[{"node": "Classify Priority", "type": "main", "index": 0}]]
+    },
+    "Claude Sonnet 4.5": {
+      "ai_languageModel": [[{"node": "Classify Priority", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Classify Priority": {
+      "main": [[{"node": "Update Ticket Priority", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -8,9 +8,9 @@ This repository contains n8n workflow automations built with AI assistance. Work
 
 | File | Name | Description | n8n ID | Status |
 |------|------|-------------|--------|--------|
-| `notion-todoist-bidirectional-sync.json` | Notion-Todoist Sync | Bidirectional task sync between Notion Tasks database and Todoist Work project | `6qdUqbQ25uHzfSYe` | In Development |
-| `zendesk-ai-priority-classifier-webhook.json` | Zendesk AI Priority Classifier | Webhook-triggered: classifies priority with Claude Sonnet 4.5, updates priority field and adds internal note | `EuufrUixOtDlA55c` | Active |
-| `zendesk-ai-priority-classifier-polling.json` | Zendesk AI Priority Classifier (Polling) | Polls every 2 min for new tickets (fallback if webhooks unavailable) | `EuufrUixOtDlA55c` | Backup |
+| `notion-todoist-bidirectional-sync.json` | Notion-Todoist Sync | Bidirectional task sync between Notion Tasks database and Todoist Work project | `txgrs1TeIaOuorlF` | Inactive |
+| `zendesk-ai-priority-classifier-webhook.json` | Zendesk AI Priority Classifier | Webhook-triggered: classifies priority with Claude Sonnet 4.5 via OpenRouter, updates priority field and adds internal note | `SpkfnVqNO0NvuIe7` | Active |
+| `zendesk-ai-priority-classifier-polling.json` | Zendesk AI Priority Classifier (Polling) | Polls every 2 min for new tickets (fallback if webhooks unavailable) | N/A | Backup |
 
 ### Workflow File Conventions
 
@@ -18,20 +18,19 @@ This repository contains n8n workflow automations built with AI assistance. Work
 - **Documentation**: Include sticky notes in workflow explaining purpose, setup, and mappings
 - **Dry Run**: When possible, include a "Dry Run" trigger for safe testing
 - **Credentials**: Use placeholder credential names; actual credentials are configured in n8n
-- **Webhooks on Cloud Run**: MUST include `webhookId` property on webhook nodes for proper registration in database-backed mode
 
 ### Deploying Workflows
 
 To deploy or update a workflow:
 ```python
-# Via Python (when curl has issues)
+# Via Python
 python3 -c "
 import json, urllib.request
 with open('workflow-file.json', 'r') as f:
     workflow = json.load(f)
-url = 'https://n8n-instance/api/v1/workflows/WORKFLOW_ID'
+url = 'https://twofifteen.app.n8n.cloud/api/v1/workflows/WORKFLOW_ID'
 req = urllib.request.Request(url, json.dumps(workflow).encode(), method='PUT')
-req.add_header('X-N8N-API-KEY', 'api-key')
+req.add_header('X-N8N-API-KEY', 'YOUR_API_KEY')  # Get from .env
 req.add_header('Content-Type', 'application/json')
 urllib.request.urlopen(req)
 "
@@ -39,78 +38,33 @@ urllib.request.urlopen(req)
 
 ---
 
-## GCP Cloud Run Deployment
+## n8n Hosted Instance
 
-### Project Details
+### Instance Details
 
 | Setting | Value |
 |---------|-------|
-| GCP Project ID | `n8n-2fifteen` |
-| Cloud Run Service | `n8n` |
-| Region | `us-central1` |
-| n8n URL | `https://n8n-h7xi375qea-uc.a.run.app` |
-| Min Instances | `1` (prevents cold starts for webhooks) |
+| Provider | n8n Cloud |
+| Instance URL | `https://twofifteen.app.n8n.cloud` |
+| Editor URL | `https://twofifteen.app.n8n.cloud` |
 
-### Environment Variables (Cloud Run)
+### API Access
 
-Key environment variables configured in Cloud Run:
-- `WEBHOOK_URL`: `https://n8n-h7xi375qea-uc.a.run.app` (required for webhook registration)
-- `N8N_HOST`: `n8n-h7xi375qea-uc.a.run.app`
-- `N8N_EDITOR_BASE_URL`: `https://n8n-h7xi375qea-uc.a.run.app`
-- `DB_TYPE`: `postgresdb` (Cloud SQL)
+API credentials are stored in `.env` (gitignored):
+- `N8N_API_KEY`: REST API authentication
+- `N8N_MCP_ACCESS_TOKEN`: MCP server authentication
 
-### Cloud Run Commands
+### Webhook URLs
 
-```bash
-# Check service status
-gcloud run services describe n8n --project=n8n-2fifteen --region=us-central1
-
-# View environment variables
-gcloud run services describe n8n --project=n8n-2fifteen --region=us-central1 --format='yaml(spec.template.spec.containers[0].env)'
-
-# View logs
-gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="n8n"' --project=n8n-2fifteen --limit=50 --format="value(textPayload)"
-
-# Restart service (force new revision)
-gcloud run services update n8n --project=n8n-2fifteen --region=us-central1 --update-env-vars="RESTART_TRIGGER=$(date +%s)"
+Webhook URLs follow the pattern:
+```
+https://twofifteen.app.n8n.cloud/webhook/<path>
 ```
 
-### Webhook Troubleshooting
-
-If webhooks return 404 "not registered":
-
-1. **Verify webhookId property** - Webhook nodes MUST have a `webhookId` property for Cloud Run deployments:
-   ```json
-   {
-     "type": "n8n-nodes-base.webhook",
-     "webhookId": "unique-webhook-id",
-     "parameters": { "path": "my-webhook", ... }
-   }
-   ```
-
-2. **Deactivate/reactivate workflow** - Forces webhook re-registration:
-   ```bash
-   # Via API
-   curl -X POST "$N8N_URL/api/v1/workflows/$WORKFLOW_ID/deactivate" -H "X-N8N-API-KEY: $API_KEY"
-   curl -X POST "$N8N_URL/api/v1/workflows/$WORKFLOW_ID/activate" -H "X-N8N-API-KEY: $API_KEY"
-   ```
-
-3. **Check logs for registration errors**:
-   ```bash
-   gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="n8n"' --project=n8n-2fifteen --limit=30 --format="value(textPayload)" | grep -i "webhook\|error\|activated"
-   ```
-
-4. **Verify min instances = 1** - Prevents cold start issues with webhook registration
-
-### Schedule Trigger Caching Issue
-
-When replacing a schedule trigger with a webhook trigger, n8n may cache the old schedule in memory. To clear:
-
-1. Deactivate the workflow via API
-2. Wait 2-3 seconds
-3. Reactivate the workflow via API
-
-This forces n8n to reload the workflow configuration and stop the cached schedule.
+For test webhooks (when workflow is inactive):
+```
+https://twofifteen.app.n8n.cloud/webhook-test/<path>
+```
 
 ---
 
@@ -118,8 +72,9 @@ This forces n8n to reload the workflow configuration and stop the cached schedul
 
 This project uses the following MCP servers:
 
-1. **[n8n-mcp](https://github.com/czlonkowski/n8n-mcp)** - Workflow automation capabilities
-2. **[Notion MCP](https://developers.notion.com/docs/mcp)** - Notion workspace integration
+1. **[n8n-mcp](https://github.com/czlonkowski/n8n-mcp)** - Workflow automation capabilities (third-party)
+2. **n8n-cloud-mcp** - n8n Cloud's native MCP server (via mcp-remote)
+3. **[Notion MCP](https://developers.notion.com/docs/mcp)** - Notion workspace integration
 
 ### Configuration
 
@@ -132,12 +87,13 @@ All MCP server credentials are stored directly in `.mcp.json` (gitignored for se
 | File | Contents | Git Status |
 |------|----------|------------|
 | `.mcp.json` | MCP server config with credentials | **Gitignored** (contains secrets) |
-| `.env` | Backup/reference secrets | **Gitignored** |
+| `.env` | API keys and secrets reference | **Gitignored** |
 
 ### Updating Credentials
 
 To update API keys, edit `.mcp.json` directly:
 - `n8n-mcp`: Update `N8N_API_URL` and `N8N_API_KEY` in the env section
+- `n8n-cloud-mcp`: Update the Bearer token in the args
 - `notion`: Update `NOTION_TOKEN` with your `ntn_*` integration token
 
 ---

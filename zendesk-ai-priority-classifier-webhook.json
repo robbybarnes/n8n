@@ -2,25 +2,19 @@
   "name": "Zendesk AI Priority Classifier",
   "nodes": [
     {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zendesk-new-ticket",
+        "options": {}
+      },
       "id": "webhook-trigger",
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [0, 0],
-      "webhookId": "zendesk-new-ticket-webhook",
-      "parameters": {
-        "path": "zendesk-new-ticket",
-        "httpMethod": "POST",
-        "responseMode": "onReceived",
-        "options": {}
-      }
+      "webhookId": "zendesk-new-ticket-webhook"
     },
     {
-      "id": "filter-unprocessed",
-      "name": "Not Yet Processed?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [220, 0],
       "parameters": {
         "conditions": {
           "options": {
@@ -41,42 +35,27 @@
               }
             }
           ]
-        }
-      }
-    },
-    {
-      "id": "anthropic-model",
-      "name": "Claude Sonnet 4.5",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
-      "position": [440, 200],
-      "parameters": {
-        "model": {"mode": "id", "value": "claude-sonnet-4-5-20250929"}
+        },
+        "options": {}
       },
-      "credentials": {
-        "anthropicApi": {"id": "anthropic", "name": "Anthropic account"}
-      }
+      "id": "filter-unprocessed",
+      "name": "Not Yet Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [224, 0]
     },
     {
-      "id": "information-extractor",
-      "name": "Classify Priority",
-      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
-      "typeVersion": 1.2,
-      "position": [440, 0],
       "parameters": {
         "text": "={{ $json.body.detail.subject }}: {{ $json.body.detail.description }}",
-        "schemaType": "fromAttributes",
         "attributes": {
           "attributes": [
             {
               "name": "priority",
-              "type": "string",
               "description": "The priority level. MUST be exactly one of these lowercase values: low, normal, high, urgent.",
               "required": true
             },
             {
               "name": "explanation",
-              "type": "string",
               "description": "A brief 1-2 sentence explanation of why this priority level was assigned.",
               "required": true
             }
@@ -85,33 +64,59 @@
         "options": {
           "systemPromptTemplate": "You are a support ticket priority classifier. Analyze the ticket content and determine the appropriate priority level.\n\nPriority Guidelines:\n- URGENT: System completely down, security breach, data loss risk, significant revenue impact\n- HIGH: Major feature not working, significant workflow blocked\n- NORMAL: Feature issue but workaround exists, general questions\n- LOW: Minor cosmetic issues, feature requests\n\nAlways respond with the priority in lowercase (low, normal, high, urgent) and provide a clear, professional explanation."
         }
-      }
+      },
+      "id": "information-extractor",
+      "name": "Classify Priority",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [448, 0]
     },
     {
-      "id": "zendesk-update",
-      "name": "Update Ticket Priority",
-      "type": "n8n-nodes-base.zendesk",
-      "typeVersion": 1,
-      "position": [660, 0],
       "parameters": {
-        "resource": "ticket",
         "operation": "update",
         "id": "={{ $('Webhook Trigger').item.json.body.detail.id }}",
         "jsonParameters": true,
         "updateFieldsJson": "={{ JSON.stringify({ priority: $json.output.priority, tags: $('Webhook Trigger').item.json.body.detail.tags.concat(['ai-priority-set']), comment: { body: '\ud83e\udd16 AI Priority Assessment:\\n\\n' + $json.output.explanation + '\\n\\n---\\nPriority automatically set to: ' + $json.output.priority.toUpperCase(), public: false } }) }}"
       },
+      "id": "zendesk-update",
+      "name": "Update Ticket Priority",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [784, 0],
       "credentials": {
-        "zendeskApi": {"id": "zendesk", "name": "Zendesk account"}
+        "zendeskApi": {
+          "id": "zendesk",
+          "name": "Zendesk account"
+        }
       }
     },
     {
+      "parameters": {
+        "content": "## Zendesk AI Priority Classifier (Webhook)\n\n**Purpose**: Automatically classify new Zendesk tickets by priority using Claude Sonnet 4.5 via OpenRouter\n\n**Webhook URL**: https://twofifteen.app.n8n.cloud/webhook/zendesk-new-ticket\n\n**How it works**:\n1. Zendesk sends webhook with ticket data on new ticket\n2. Checks if ticket already has 'ai-priority-set' tag\n3. Sends ticket subject/description to Claude (via OpenRouter) for analysis\n4. Updates ticket priority and adds internal note\n\n**Data Path**: Ticket data is at `$json.body.detail.*`\n\n**Note**: Uses ticket data directly from webhook payload (no separate API call)",
+        "height": 864,
+        "width": 288
+      },
       "id": "sticky-note",
       "name": "Workflow Documentation",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-200, -150],
+      "position": [-416, -384]
+    },
+    {
       "parameters": {
-        "content": "## Zendesk AI Priority Classifier (Webhook)\n\n**Purpose**: Automatically classify new Zendesk tickets by priority using Claude Sonnet 4.5\n\n**Webhook URL**: https://n8n-h7xi375qea-uc.a.run.app/webhook/zendesk-new-ticket\n\n**How it works**:\n1. Zendesk sends webhook with ticket data on new ticket\n2. Checks if ticket already has 'ai-priority-set' tag\n3. Sends ticket subject/description to Claude for analysis\n4. Updates ticket priority and adds internal note\n\n**Data Path**: Ticket data is at `$json.body.detail.*`\n\n**Note**: Uses ticket data directly from webhook payload (no separate API call)"
+        "model": "anthropic/claude-sonnet-4.5",
+        "options": {}
+      },
+      "id": "openrouter-model",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [384, 208],
+      "credentials": {
+        "openRouterApi": {
+          "id": "openrouter",
+          "name": "OpenRouter account"
+        }
       }
     }
   ],
@@ -122,7 +127,7 @@
     "Not Yet Processed?": {
       "main": [[{"node": "Classify Priority", "type": "main", "index": 0}]]
     },
-    "Claude Sonnet 4.5": {
+    "OpenRouter Chat Model": {
       "ai_languageModel": [[{"node": "Classify Priority", "type": "ai_languageModel", "index": 0}]]
     },
     "Classify Priority": {

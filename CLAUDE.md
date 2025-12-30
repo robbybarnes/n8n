@@ -8,6 +8,7 @@ This repository contains n8n workflow automations built with AI assistance. Work
 
 | File | Name | Description | n8n ID | Status |
 |------|------|-------------|--------|--------|
+| `daily-meeting-research-brief.json` | Daily Meeting Research Brief | AI agent researches meeting attendees via Firecrawl, Gmail, Attio CRM, and Apollo.io; sends brief to Slack DM at 9 AM MST | `rweIBE0YGIgk2mno` | Active |
 | `notion-todoist-bidirectional-sync.json` | Notion-Todoist Sync | Bidirectional task sync between Notion Tasks database and Todoist Work project | `txgrs1TeIaOuorlF` | Inactive |
 | `zendesk-ai-priority-classifier-webhook.json` | Zendesk AI Priority Classifier | Webhook-triggered: classifies priority with Claude Sonnet 4.5 via OpenRouter, updates priority field and adds internal note | `SpkfnVqNO0NvuIe7` | Active |
 | `zendesk-ai-priority-classifier-polling.json` | Zendesk AI Priority Classifier (Polling) | Polls every 2 min for new tickets (fallback if webhooks unavailable) | N/A | Backup |

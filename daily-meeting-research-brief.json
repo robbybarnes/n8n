@@ -1,0 +1,708 @@
+{
+  "id": "rweIBE0YGIgk2mno",
+  "name": "Daily Meeting Research Brief",
+  "description": null,
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Daily Meeting Research Brief\n\nThis workflow researches your meeting attendees every morning and sends you a comprehensive brief via Slack DM.\n\n### What it does\n1. **6 AM Trigger**: Runs every weekday morning\n2. **Calendar Scan**: Fetches today's meetings from Google Calendar\n3. **AI Research**: For each external meeting:\n   - Searches web via Firecrawl\n   - Checks Gmail for past interactions\n   - Looks up contacts in Attio CRM\n   - Researches companies via Apollo.io\n4. **Brief Generation**: Creates scannable meeting prep\n5. **Slack DM**: Sends brief directly to you\n\n### Required Credentials (configure in n8n)\n- **Google Calendar OAuth2** - for calendar access\n- **Gmail OAuth2** - for email history search\n- **Slack OAuth2** - for sending DM\n- **OpenRouter API** - for AI processing\n- **Firecrawl API** - HTTP Header Auth (key: Authorization, value: Bearer YOUR_KEY)\n- **Attio API** - HTTP Bearer Auth with your API key\n- **Apollo.io API** - HTTP Header Auth (key: X-Api-Key, value: YOUR_KEY)\n\n### Setup Steps\n1. Configure all credentials above\n2. Update 'User Configuration' node with your email\n3. Select your calendar in 'Get Today's Meetings' node\n4. Set your Slack user ID in both Slack nodes\n5. Test with Manual Trigger first\n6. Activate workflow when ready",
+        "height": 850,
+        "width": 650,
+        "color": 7
+      },
+      "id": "sticky-docs",
+      "name": "Workflow Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-800, 112],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "user-email",
+              "name": "user_email",
+              "type": "string",
+              "value": "robby@215.tech"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "user-config",
+      "name": "User Configuration",
+      "type": "n8n-nodes-base.set",
+      "position": [-80, 400],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [-80, 240],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        },
+        "options": {
+          "timezone": "America/Denver"
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [-80, 560],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "robby@215.tech",
+          "mode": "list",
+          "cachedResultName": "robby@215.tech"
+        },
+        "timeMin": "={{ $today }}",
+        "timeMax": "={{ $today.plus({ day: 1 }) }}",
+        "options": {}
+      },
+      "id": "get-calendar-events",
+      "name": "Get Today's Meetings",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [160, 400],
+      "typeVersion": 1.3,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "49z9Ev9ewj8jRLb3",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-external-attendees",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.attendees.filter(a => !a.email.endsWith('@215.tech')).length }}",
+              "rightValue": 0
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "filter-external",
+      "name": "Filter External Meetings",
+      "type": "n8n-nodes-base.filter",
+      "position": [400, 400],
+      "typeVersion": 2.2,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-id",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "leftValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-meetings",
+      "name": "Has External Meetings?",
+      "type": "n8n-nodes-base.if",
+      "position": [640, 400],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "UNGG09PRC"
+        },
+        "text": "Good morning! No external meetings scheduled for today. Enjoy your focus time!",
+        "otherOptions": {}
+      },
+      "id": "no-meetings-msg",
+      "name": "No Meetings Today",
+      "type": "n8n-nodes-base.slack",
+      "position": [880, 560],
+      "typeVersion": 2.3,
+      "webhookId": "4d656faf-053f-4d89-b46a-7e52803aab14",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "id",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "id": "split-events",
+      "name": "Process Each Meeting",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [880, 288],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a meeting preparation assistant. Research this meeting and prepare context:\n\nMeeting Details:\n- Summary: {{ $json.summary }}\n- Start: {{ $json.start.dateTime }}\n- End: {{ $json.end.dateTime }}\n- Attendees: {{ $json.attendees.filter(a => a.email !== $('User Configuration').item.json.user_email).map(a => a.email).join(', ') }}\n\nYour tasks:\n1. Use Firecrawl to search for information about each attendee\n2. Search Gmail for any previous email interactions\n3. Check the CRM for existing contact information\n4. Research their company using Apollo.io\n5. Prepare key talking points and meeting objectives\n\nProvide a comprehensive but concise meeting preparation report.",
+        "options": {
+          "systemMessage": "You are an expert meeting preparation assistant. Use the available tools to research attendees and their companies. Focus on actionable intelligence that helps prepare for productive meetings."
+        }
+      },
+      "id": "ai-agent",
+      "name": "AI Meeting Research",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [1280, 304],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-sonnet-4",
+        "options": {}
+      },
+      "id": "openrouter-model",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "position": [1120, 528],
+      "typeVersion": 1,
+      "credentials": {
+        "openRouterApi": {
+          "id": "9Cpj8UNSpHEq0gYe",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Searches the web for information about people, companies, and topics using Firecrawl. Use for finding recent news, LinkedIn profiles, company websites, and other public information. Returns title, description, and URL for each result.",
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v2/search",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer fc-5a2e1ea9646b46a69db9a565ab90f04f"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $fromAI('searchQuery', 'person name, company, or topic to search', 'string'), limit: 5, sources: ['web'] }) }}",
+        "options": {}
+      },
+      "id": "firecrawl-search",
+      "name": "Firecrawl Web Search",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "position": [1280, 528],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 10,
+        "filters": {
+          "q": "={{ $fromAI('searchQuery', 'email address or name to search', 'string') }}"
+        }
+      },
+      "id": "gmail-search",
+      "name": "Search Gmail History",
+      "type": "n8n-nodes-base.gmailTool",
+      "position": [1408, 528],
+      "typeVersion": 2.1,
+      "webhookId": "7b5ad9cf-a331-4474-bd78-c9713291f93f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "iexEvIgq9ry16qlG",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Search CRM for existing contact information by email address. Returns contact details, notes, and interaction history.",
+        "method": "POST",
+        "url": "https://api.attio.com/v2/objects/people/records/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"filter\": {\"email_addresses\": \"{{ $fromAI('email', 'email address to look up', 'string') }}\"}, \"limit\": 1}",
+        "options": {}
+      },
+      "id": "attio-search",
+      "name": "Search Attio CRM",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "position": [1536, 528],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Retrieves company data from Apollo.io including industry, employee count, revenue, technologies, and key details. Use to research companies before meetings.",
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/mixed_companies/search",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "no-cache"
+            },
+            {
+              "name": "x-api-key",
+              "value": "CbrPaBAyISeAvpdQMhRSLw"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ q_organization_name: $fromAI('companyName', 'company name to research', 'string') }) }}",
+        "options": {}
+      },
+      "id": "apollo-search",
+      "name": "Apollo Company Research",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "position": [1664, 528],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "robby@215.tech",
+          "mode": "list",
+          "cachedResultName": "robby@215.tech"
+        },
+        "limit": 20,
+        "timeMin": "={{ $fromAI('startDate', 'ISO date string', 'string') }}",
+        "timeMax": "={{ $fromAI('endDate', 'ISO date string', 'string') }}",
+        "options": {}
+      },
+      "id": "calendar-tool",
+      "name": "Search Past Meetings",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [1792, 528],
+      "typeVersion": 1.3,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "49z9Ev9ewj8jRLb3",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map((item, index) => {\n  let content = item.json.markdown_content || item.json.output || item.json.content || '';\n  \n  content = content.replace(/\"/g, '');\n  content = content.replace(/'/g, '');\n  content = content.replace(/\\r\\n/g, '\\n');\n  content = content.replace(/\\r/g, '\\n');\n  content = content.trim();\n  content = content.split(/\\n/).map(line => line.trim()).join('\\n');\n  content = content.replace(/\\n\\s*\\n\\s*\\n/g, '\\n\\n');\n  \n  return {\n    json: {\n      ...item.json,\n      cleaned_content: content\n    },\n    pairedItem: { item: index }\n  };\n});"
+      },
+      "id": "clean-content",
+      "name": "Clean Research Content",
+      "type": "n8n-nodes-base.code",
+      "position": [1920, 304],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "attendees-list",
+              "name": "attendees",
+              "type": "array",
+              "value": "={{ $('Process Each Meeting').item.json.attendees.filter(a => a.email !== $('User Configuration').item.json.user_email) }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "extract-attendees",
+      "name": "Extract External Attendees",
+      "type": "n8n-nodes-base.set",
+      "position": [2160, 160],
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "attendees",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "id": "split-attendees",
+      "name": "Split Attendees",
+      "type": "n8n-nodes-base.splitOut",
+      "position": [2400, 160],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/objects/people/records/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"filter\": {\"email_addresses\": \"{{ $json.attendees.email }}\"}, \"limit\": 1}",
+        "options": {}
+      },
+      "id": "find-attio-person",
+      "name": "Find Person in Attio",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [2640, 160],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-record",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "leftValue": "={{ $json.data[0].id.record_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "person-exists",
+      "name": "Person Exists in CRM?",
+      "type": "n8n-nodes-base.if",
+      "position": [2880, 160],
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/objects/people/records",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"data\": {\"values\": {\"email_addresses\": [{\"email_address\": \"{{ $json.attendees.email }}\"}]}}}",
+        "options": {}
+      },
+      "id": "create-person",
+      "name": "Create Person Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [3120, 240],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "merge-crm",
+      "name": "Merge CRM Results",
+      "type": "n8n-nodes-base.merge",
+      "position": [3360, 160],
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/notes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"data\": {\"parent_object\": \"people\", \"parent_record_id\": \"{{ $json.data[0].id.record_id }}\", \"title\": \"Meeting Prep - {{ $now.toFormat('yyyy-MM-dd') }}\", \"content\": \"{{ $('Clean Research Content').item.json.cleaned_content.replaceAll('\\n','\\\\n') }}\", \"format\": \"markdown\"}}",
+        "options": {}
+      },
+      "id": "add-note",
+      "name": "Add Meeting Prep Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [3600, 160],
+      "typeVersion": 4.2,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "output"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "aggregate-research",
+      "name": "Aggregate All Research",
+      "type": "n8n-nodes-base.aggregate",
+      "position": [2160, 464],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a scannable meeting brief for my {{ $json.output.length }} meetings today.\n\nIMPORTANT: Format using Slack mrkdwn syntax (NOT standard markdown):\n- Use *bold* for emphasis (single asterisks)\n- Use _italic_ for secondary emphasis (underscores)\n- Use `code` for technical terms\n- Use > for blockquotes\n- NO headers with # (Slack doesn't support them)\n- NO **double asterisks**\n\nFor EACH meeting, use this format:\n\n*[TIME] Meeting Title*\n_Who:_ Name, Company/Role\n_Purpose:_ 2-3 sentences on why this meeting matters\n_Key Context:_ 1-2 critical facts about them/their company\n_Action:_ Your main goal for this meeting\n_Watch For:_ One thing to pay attention to\n\n---\n\nRules:\n- Be extremely concise and actionable\n- No introductions or conclusions\n- Focus on intelligence that helps me prepare\n- Separate meetings with a divider line (---)\n\nMeeting research data:\n{{ $json.output.map((m, i) => `\\n=== MEETING ${i + 1} ===\\n${JSON.stringify(m, null, 2)}\\n`).join('\\n') }}",
+        "batching": {}
+      },
+      "id": "format-brief",
+      "name": "Format Daily Brief",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [2400, 464],
+      "typeVersion": 1.7
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-sonnet-4",
+        "options": {}
+      },
+      "id": "openrouter-model-2",
+      "name": "OpenRouter Chat Model 2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "position": [2480, 688],
+      "typeVersion": 1,
+      "credentials": {
+        "openRouterApi": {
+          "id": "9Cpj8UNSpHEq0gYe",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "UNGG09PRC",
+          "mode": "id"
+        },
+        "text": "=*Your Meeting Brief for Today*\n\n{{ $json.text }}",
+        "otherOptions": {}
+      },
+      "id": "send-brief",
+      "name": "Send Brief via Slack DM",
+      "type": "n8n-nodes-base.slack",
+      "position": [2720, 464],
+      "typeVersion": 2.3,
+      "webhookId": "4d5df0b2-515f-4c43-91e4-812c3fb5f651",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "User Configuration", "type": "main", "index": 0}]]
+    },
+    "Schedule Trigger": {
+      "main": [[{"node": "User Configuration", "type": "main", "index": 0}]]
+    },
+    "User Configuration": {
+      "main": [[{"node": "Get Today's Meetings", "type": "main", "index": 0}]]
+    },
+    "Get Today's Meetings": {
+      "main": [[{"node": "Filter External Meetings", "type": "main", "index": 0}]]
+    },
+    "Filter External Meetings": {
+      "main": [[{"node": "Has External Meetings?", "type": "main", "index": 0}]]
+    },
+    "Has External Meetings?": {
+      "main": [
+        [{"node": "Process Each Meeting", "type": "main", "index": 0}],
+        [{"node": "No Meetings Today", "type": "main", "index": 0}]
+      ]
+    },
+    "Process Each Meeting": {
+      "main": [[{"node": "AI Meeting Research", "type": "main", "index": 0}]]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [[{"node": "AI Meeting Research", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Firecrawl Web Search": {
+      "ai_tool": [[{"node": "AI Meeting Research", "type": "ai_tool", "index": 0}]]
+    },
+    "Search Gmail History": {
+      "ai_tool": [[{"node": "AI Meeting Research", "type": "ai_tool", "index": 0}]]
+    },
+    "Search Attio CRM": {
+      "ai_tool": [[{"node": "AI Meeting Research", "type": "ai_tool", "index": 0}]]
+    },
+    "Apollo Company Research": {
+      "ai_tool": [[{"node": "AI Meeting Research", "type": "ai_tool", "index": 0}]]
+    },
+    "Search Past Meetings": {
+      "ai_tool": [[{"node": "AI Meeting Research", "type": "ai_tool", "index": 0}]]
+    },
+    "AI Meeting Research": {
+      "main": [[{"node": "Clean Research Content", "type": "main", "index": 0}]]
+    },
+    "Clean Research Content": {
+      "main": [
+        [
+          {"node": "Extract External Attendees", "type": "main", "index": 0},
+          {"node": "Aggregate All Research", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Extract External Attendees": {
+      "main": [[{"node": "Split Attendees", "type": "main", "index": 0}]]
+    },
+    "Split Attendees": {
+      "main": [[{"node": "Find Person in Attio", "type": "main", "index": 0}]]
+    },
+    "Find Person in Attio": {
+      "main": [[{"node": "Person Exists in CRM?", "type": "main", "index": 0}]]
+    },
+    "Person Exists in CRM?": {
+      "main": [
+        [{"node": "Merge CRM Results", "type": "main", "index": 0}],
+        [{"node": "Create Person Record", "type": "main", "index": 0}]
+      ]
+    },
+    "Create Person Record": {
+      "main": [[{"node": "Merge CRM Results", "type": "main", "index": 1}]]
+    },
+    "Merge CRM Results": {
+      "main": [[{"node": "Add Meeting Prep Note", "type": "main", "index": 0}]]
+    },
+    "Aggregate All Research": {
+      "main": [[{"node": "Format Daily Brief", "type": "main", "index": 0}]]
+    },
+    "OpenRouter Chat Model 2": {
+      "ai_languageModel": [[{"node": "Format Daily Brief", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Format Daily Brief": {
+      "main": [[{"node": "Send Brief via Slack DM", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {}
+}

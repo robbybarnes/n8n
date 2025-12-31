@@ -12,6 +12,7 @@ This repository contains n8n workflow automations built with AI assistance. Work
 | `notion-todoist-bidirectional-sync.json` | Notion-Todoist Sync | Bidirectional task sync between Notion Tasks database and Todoist Work project | `txgrs1TeIaOuorlF` | Inactive |
 | `zendesk-ai-priority-classifier-webhook.json` | Zendesk AI Priority Classifier | Webhook-triggered: classifies priority with Claude Sonnet 4.5 via OpenRouter, updates priority field and adds internal note | `SpkfnVqNO0NvuIe7` | Active |
 | `zendesk-ai-priority-classifier-polling.json` | Zendesk AI Priority Classifier (Polling) | Polls every 2 min for new tickets (fallback if webhooks unavailable) | N/A | Backup |
+| `zendesk-voice-summary.json` | Zendesk Voice Call Summary | Webhook-triggered: transcribes phone call recordings via OpenRouter (Gemini 2.5 Flash), summarizes, posts as private comment | `h0VuVi8v9Y4hGoz1` | Inactive |
 
 ### Workflow File Conventions
 

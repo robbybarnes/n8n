@@ -1,0 +1,421 @@
+{
+  "name": "Zendesk Voice Call Summary",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zendesk-voice-summary",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      }
+    },
+    {
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 500],
+      "parameters": {}
+    },
+    {
+      "id": "if-phone-call",
+      "name": "Has phone_call Tag",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-phone-call",
+              "leftValue": "={{ $json.ticket.tags }}",
+              "rightValue": "phone_call",
+              "operator": {
+                "type": "array",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "get-ticket-comments",
+      "name": "Get Ticket Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 200],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://twofifteen.zendesk.com/api/v2/tickets/{{ $json.ticket.id }}/comments.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      }
+    },
+    {
+      "id": "filter-voice-comments",
+      "name": "Filter Voice Comments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 200],
+      "parameters": {
+        "jsCode": "const comments = $input.first().json.comments || [];\nconst ticketId = $('Has phone_call Tag').first().json.ticket.id;\n\nconst voiceComments = comments.filter(c =>\n  c.type === 'VoiceComment' &&\n  c.data?.recording_url &&\n  c.data?.recorded === true\n);\n\nif (voiceComments.length === 0) {\n  return [{ json: { error: 'No voice recordings found', ticketId } }];\n}\n\nreturn voiceComments.map(vc => ({\n  json: {\n    ticketId,\n    recordingUrl: vc.data.recording_url,\n    callDuration: vc.data.duration_in_seconds,\n    callDirection: vc.data.call_direction\n  }\n}));"
+      }
+    },
+    {
+      "id": "check-recording-exists",
+      "name": "Recording Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 200],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-recording-url",
+              "leftValue": "={{ $json.recordingUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "download-recording",
+      "name": "Download Recording",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 100],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.recordingUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "audioFile"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "convert-to-base64",
+      "name": "Convert to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 100],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const binaryData = item.binary?.audioFile;\n  if (!binaryData) {\n    results.push({ json: { ...item.json, error: 'No binary audio data' } });\n    continue;\n  }\n\n  const buffer = await this.helpers.getBinaryDataBuffer(items.indexOf(item), 'audioFile');\n  const base64Audio = buffer.toString('base64');\n\n  // Detect format from mime type\n  const mimeType = binaryData.mimeType || 'audio/mpeg';\n  let format = 'mp3';\n  if (mimeType.includes('wav')) format = 'wav';\n  else if (mimeType.includes('ogg')) format = 'ogg';\n  else if (mimeType.includes('m4a') || mimeType.includes('mp4')) format = 'm4a';\n  else if (mimeType.includes('flac')) format = 'flac';\n\n  results.push({\n    json: {\n      ...item.json,\n      base64Audio,\n      audioFormat: format\n    }\n  });\n}\n\nreturn results;"
+      }
+    },
+    {
+      "id": "transcribe-audio",
+      "name": "Transcribe via OpenRouter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"google/gemini-2.5-flash\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Please transcribe this audio file accurately. Include speaker labels if you can identify different speakers (e.g., Agent: and Customer:).\"\n        },\n        {\n          \"type\": \"input_audio\",\n          \"inputAudio\": {\n            \"data\": \"{{ $json.base64Audio }}\",\n            \"format\": \"{{ $json.audioFormat }}\"\n          }\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "extract-transcription",
+      "name": "Extract Transcription",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1760, 100],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticketId",
+              "name": "ticketId",
+              "value": "={{ $('Convert to Base64').item.json.ticketId }}",
+              "type": "number"
+            },
+            {
+              "id": "transcription",
+              "name": "transcription",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "callDuration",
+              "name": "callDuration",
+              "value": "={{ $('Convert to Base64').item.json.callDuration }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "summarize-call",
+      "name": "Summarize via OpenRouter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openrouter/auto\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful assistant that summarizes customer support call transcripts. Provide a concise summary highlighting: 1) Main issue/reason for call 2) Key discussion points 3) Resolution or next steps 4) Customer sentiment. Keep the summary under 200 words.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.transcription }}\"\n    }\n  ]\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "prepare-comment",
+      "name": "Prepare Comment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2200, 100],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticketId",
+              "name": "ticketId",
+              "value": "={{ $('Extract Transcription').item.json.ticketId }}",
+              "type": "number"
+            },
+            {
+              "id": "transcription",
+              "name": "transcription",
+              "value": "={{ $('Extract Transcription').item.json.transcription }}",
+              "type": "string"
+            },
+            {
+              "id": "summary",
+              "name": "summary",
+              "value": "={{ $json.choices[0].message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "callDuration",
+              "name": "callDuration",
+              "value": "={{ $('Extract Transcription').item.json.callDuration }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "post-zendesk-comment",
+      "name": "Post to Zendesk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 100],
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://twofifteen.zendesk.com/api/v2/tickets/{{ $json.ticketId }}.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ticket\": {\n    \"comment\": {\n      \"body\": \"## Call Summary\\n\\n{{ $json.summary }}\\n\\n---\\n\\n## Full Transcription\\n\\n{{ $json.transcription }}\",\n      \"public\": false\n    }\n  }\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "sticky-note-1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, 140],
+      "parameters": {
+        "content": "## Zendesk Voice Call Summary\n\nThis workflow:\n1. Receives webhook when Zendesk ticket is marked Solved\n2. Filters for tickets with phone_call tag\n3. Downloads call recordings\n4. Transcribes audio via OpenRouter (Gemini 2.5 Flash)\n5. Summarizes the call\n6. Posts summary as private comment\n\n**Credentials Required:**\n- Zendesk Basic Auth\n- OpenRouter API Key (Header Auth)"
+      }
+    },
+    {
+      "id": "sticky-note-2",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [860, 340],
+      "parameters": {
+        "content": "### Error Handling\n\nIf no recording found, workflow stops here.\nAdd additional error nodes if needed."
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Has phone_call Tag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Has phone_call Tag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has phone_call Tag": {
+      "main": [
+        [
+          {
+            "node": "Get Ticket Comments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get Ticket Comments": {
+      "main": [
+        [
+          {
+            "node": "Filter Voice Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Voice Comments": {
+      "main": [
+        [
+          {
+            "node": "Recording Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recording Exists": {
+      "main": [
+        [
+          {
+            "node": "Download Recording",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Download Recording": {
+      "main": [
+        [
+          {
+            "node": "Convert to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Base64": {
+      "main": [
+        [
+          {
+            "node": "Transcribe via OpenRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe via OpenRouter": {
+      "main": [
+        [
+          {
+            "node": "Extract Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Transcription": {
+      "main": [
+        [
+          {
+            "node": "Summarize via OpenRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize via OpenRouter": {
+      "main": [
+        [
+          {
+            "node": "Prepare Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Comment": {
+      "main": [
+        [
+          {
+            "node": "Post to Zendesk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

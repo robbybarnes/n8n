@@ -102,7 +102,7 @@ const alreadyResolvedCheck = ifElse({
         conditions: [
           {
             id: 'has-resolved-tag',
-            leftValue: expr('{{ $json.tags.includes("betterstack-resolved") }}'),
+            leftValue: expr('{{ ($json.tags || []).includes("betterstack-resolved") }}'),
             rightValue: true,
             operator: { type: 'boolean', operation: 'equals' },
           },
@@ -137,20 +137,37 @@ const incident = $('Execute Workflow Trigger').item.json.incident;
 const startedAt = new Date(incident.started_at);
 const resolvedAt = new Date(incident.resolved_at);
 const diffMs = resolvedAt - startedAt;
-const days = Math.floor(diffMs / 86400000);
-const hours = Math.floor((diffMs % 86400000) / 3600000);
-const minutes = Math.floor((diffMs % 3600000) / 60000);
-const seconds = Math.floor((diffMs % 60000) / 1000);
 
-const fmt = (d) => d.toLocaleString('en-GB', {
-  day: 'numeric', month: 'short', year: 'numeric',
-  hour: 'numeric', minute: '2-digit', hour12: true,
-  timeZone: 'UTC',
-}).replace(',', ' at') + ' UTC';
+const fmt = (d) => {
+  if (!(d instanceof Date) || isNaN(d.getTime())) {
+    // Surface unparseable inputs verbatim instead of silently emitting "Invalid Date".
+    return String(d);
+  }
+  const formatted = d.toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+    timeZone: 'UTC',
+  }).replace(',', ' at');
+  // Strip the space before am/pm and lowercase it ("10:09 PM" -> "10:09pm")
+  // to match the Zapier zap output format ("21 Oct 2024 at 10:09pm UTC").
+  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';
+};
 
 const cause = incident.cause || 'Not specified';
-const incidentId = $('Execute Workflow Trigger').item.json.incident_id
-  || $('Execute Workflow Trigger').item.json.zendesk_ticket_id;
+// No fallback — if incident_id is missing that's a caller bug; we want the
+// resulting "ID: undefined" line in the comment to make the bug visible.
+const incidentId = $('Execute Workflow Trigger').item.json.incident_id;
+
+let outageLine;
+if (isNaN(diffMs) || diffMs < 0) {
+  outageLine = 'Total Outage Time - Unknown';
+} else {
+  const days = Math.floor(diffMs / 86400000);
+  const hours = Math.floor((diffMs % 86400000) / 3600000);
+  const minutes = Math.floor((diffMs % 3600000) / 60000);
+  const seconds = Math.floor((diffMs % 60000) / 1000);
+  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';
+}
 
 const lines = [
   'Status - resolved',
@@ -162,11 +179,11 @@ const lines = [
   'Start Time - ' + fmt(startedAt),
   'Resolution Time - ' + fmt(resolvedAt),
   '',
-  'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds',
+  outageLine,
 ];
 const comment = lines.join('\\n');
 
-const newTags = ticket.tags
+const newTags = (ticket.tags || [])
   .filter((t) => t !== 'betterstack-open')
   .concat(['betterstack-resolved']);
 
@@ -204,18 +221,24 @@ const computeDowntime = node({
 // because n8n's structured updateFields does not expose tags-as-array,
 // custom_fields-as-array, or comment.public.
 // ---------------------------------------------------------------------------
+// Build the expression with JSON.stringify wrapping the constants so that any
+// special characters (", \, newlines) in the configured values produce valid
+// JS string literals in the resulting expression. e.g. CATEGORY_VALUE='He said "hi"'
+// becomes:  value: "He said \"hi\""
+// Field IDs are wrapped for consistency; they're integers so this just renders
+// them as bare numbers.
 const updateFieldsJsonExpression =
   '={{ JSON.stringify({ status: "solved", tags: $json.newTags, comment: { body: $json.comment, public: ' +
   (COMMENT_PUBLIC ? 'true' : 'false') +
   ' }, custom_fields: [ { id: ' +
-  CATEGORY_FIELD_ID +
-  ', value: "' +
-  CATEGORY_VALUE +
-  '" }, { id: ' +
-  TYPE_FIELD_ID +
-  ', value: "' +
-  TYPE_VALUE +
-  '" } ] }) }}';
+  JSON.stringify(CATEGORY_FIELD_ID) +
+  ', value: ' +
+  JSON.stringify(CATEGORY_VALUE) +
+  ' }, { id: ' +
+  JSON.stringify(TYPE_FIELD_ID) +
+  ', value: ' +
+  JSON.stringify(TYPE_VALUE) +
+  ' } ] }) }}';
 
 const updateZendeskTicket = node({
   type: 'n8n-nodes-base.zendesk',
@@ -266,7 +289,13 @@ const docSticky = sticky(
     '**Tag mutations** (computed in the Code node, applied as a full replacement):\n' +
     '- removes `betterstack-open`\n' +
     '- adds `betterstack-resolved`\n' +
-    '- preserves all other existing tags',
+    '- preserves all other existing tags\n\n' +
+    '**Closed-ticket edge case**: If a ticket is already in `closed` state,\n' +
+    'the Zendesk update API will reject status changes (Zendesk auto-closes\n' +
+    '`solved` tickets after 24h, and `closed` is terminal). The receiver and\n' +
+    'poller workflows are scoped to `status<closed`, so this should never\n' +
+    'trigger here in practice — but documented for operators investigating\n' +
+    'failures from the Update Zendesk Ticket node.',
   [],
   { color: 4 }
 );

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-09T22:58:54.298Z",
+  "updatedAt": "2026-05-09T23:05:42.412Z",
   "createdAt": "2026-05-09T22:58:54.298Z",
   "id": "FXjwcoWpPhmv76ws",
   "name": "Betterstack Resolve Sub-workflow",
@@ -78,7 +78,7 @@
           "conditions": [
             {
               "id": "has-resolved-tag",
-              "leftValue": "={{ $json.tags.includes(\"betterstack-resolved\") }}",
+              "leftValue": "={{ ($json.tags || []).includes(\"betterstack-resolved\") }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -113,7 +113,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const ticket = $('Get Zendesk Ticket').item.json;\nconst incident = $('Execute Workflow Trigger').item.json.incident;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\nconst days = Math.floor(diffMs / 86400000);\nconst hours = Math.floor((diffMs % 86400000) / 3600000);\nconst minutes = Math.floor((diffMs % 3600000) / 60000);\nconst seconds = Math.floor((diffMs % 60000) / 1000);\n\nconst fmt = (d) => d.toLocaleString('en-GB', {\n  day: 'numeric', month: 'short', year: 'numeric',\n  hour: 'numeric', minute: '2-digit', hour12: true,\n  timeZone: 'UTC',\n}).replace(',', ' at') + ' UTC';\n\nconst cause = incident.cause || 'Not specified';\nconst incidentId = $('Execute Workflow Trigger').item.json.incident_id\n  || $('Execute Workflow Trigger').item.json.zendesk_ticket_id;\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds',\n];\nconst comment = lines.join('\\n');\n\nconst newTags = ticket.tags\n  .filter((t) => t !== 'betterstack-open')\n  .concat(['betterstack-resolved']);\n\nreturn [{ json: { comment: comment, newTags: newTags, ticket_id: ticket.id } }];"
+        "jsCode": "const ticket = $('Get Zendesk Ticket').item.json;\nconst incident = $('Execute Workflow Trigger').item.json.incident;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    // Surface unparseable inputs verbatim instead of silently emitting \"Invalid Date\".\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  // Strip the space before am/pm and lowercase it (\"10:09 PM\" -> \"10:09pm\")\n  // to match the Zapier zap output format (\"21 Oct 2024 at 10:09pm UTC\").\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n// No fallback \u2014 if incident_id is missing that's a caller bug; we want the\n// resulting \"ID: undefined\" line in the comment to make the bug visible.\nconst incidentId = $('Execute Workflow Trigger').item.json.incident_id;\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\\n');\n\nconst newTags = (ticket.tags || [])\n  .filter((t) => t !== 'betterstack-open')\n  .concat(['betterstack-resolved']);\n\nreturn [{ json: { comment: comment, newTags: newTags, ticket_id: ticket.id } }];"
       }
     },
     {
@@ -140,8 +140,8 @@
       }
     },
     {
-      "id": "1b69d1b1-4f68-4b75-8838-6a800e8d43a6",
-      "name": "Sticky Note 48f543e0",
+      "id": "fc01a1c3-a656-4b9e-9842-1d4b2bcf56c9",
+      "name": "Sticky Note 7aa7f816",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -149,13 +149,13 @@
         256
       ],
       "parameters": {
-        "content": "## Betterstack Resolve Sub-workflow\n\n**Purpose**: Shared resolution logic for Betterstack incidents. Called by:\n- `betterstack-zendesk-receiver` (real-time webhook receiver)\n- `betterstack-zendesk-poller` (5-min reconciler fallback)\n\n**Inputs** (Execute Workflow Trigger):\n- `zendesk_ticket_id` (string) \u2014 the Zendesk ticket to resolve\n- `incident_id` (string) \u2014 the Betterstack incident ID (for the comment)\n- `incident` (object) \u2014 the full Betterstack `data.attributes` payload\n  (must contain `name`, `cause`, `started_at`, `resolved_at`)\n\n**Idempotency**: First node fetches the ticket and the IF gate checks\nfor the `betterstack-resolved` tag. If present \u2192 no-op. If absent \u2192 run\nthe resolve flow and the Zendesk update appends `betterstack-resolved`\nto the tags as the sentinel. This makes webhook retries and webhook/poller\nraces safe.\n\n**Tag mutations** (computed in the Code node, applied as a full replacement):\n- removes `betterstack-open`\n- adds `betterstack-resolved`\n- preserves all other existing tags",
+        "content": "## Betterstack Resolve Sub-workflow\n\n**Purpose**: Shared resolution logic for Betterstack incidents. Called by:\n- `betterstack-zendesk-receiver` (real-time webhook receiver)\n- `betterstack-zendesk-poller` (5-min reconciler fallback)\n\n**Inputs** (Execute Workflow Trigger):\n- `zendesk_ticket_id` (string) \u2014 the Zendesk ticket to resolve\n- `incident_id` (string) \u2014 the Betterstack incident ID (for the comment)\n- `incident` (object) \u2014 the full Betterstack `data.attributes` payload\n  (must contain `name`, `cause`, `started_at`, `resolved_at`)\n\n**Idempotency**: First node fetches the ticket and the IF gate checks\nfor the `betterstack-resolved` tag. If present \u2192 no-op. If absent \u2192 run\nthe resolve flow and the Zendesk update appends `betterstack-resolved`\nto the tags as the sentinel. This makes webhook retries and webhook/poller\nraces safe.\n\n**Tag mutations** (computed in the Code node, applied as a full replacement):\n- removes `betterstack-open`\n- adds `betterstack-resolved`\n- preserves all other existing tags\n\n**Closed-ticket edge case**: If a ticket is already in `closed` state,\nthe Zendesk update API will reject status changes (Zendesk auto-closes\n`solved` tickets after 24h, and `closed` is terminal). The receiver and\npoller workflows are scoped to `status<closed`, so this should never\ntrigger here in practice \u2014 but documented for operators investigating\nfailures from the Update Zendesk Ticket node.",
         "color": 4
       }
     },
     {
-      "id": "2adb92fa-758c-4159-94ef-b1b14331c57c",
-      "name": "Sticky Note ab4956cd",
+      "id": "22abc97e-5a0b-4078-93bb-9d9e77ba57f0",
+      "name": "Sticky Note 0e1d70a4",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -231,9 +231,9 @@
     "builderVariant": "mcp"
   },
   "pinData": null,
-  "versionId": "33c12f85-4b1e-4767-8ef6-2966dc0addd4",
+  "versionId": "9334475d-b52c-4b2d-8f59-c5fb69f7a9e5",
   "activeVersionId": null,
-  "versionCounter": 1,
+  "versionCounter": 2,
   "triggerCount": 0,
   "shared": [
     {

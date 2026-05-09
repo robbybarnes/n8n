@@ -1,0 +1,1881 @@
+{
+  "updatedAt": "2026-05-09T23:46:28.832Z",
+  "createdAt": "2026-05-09T23:32:01.729Z",
+  "id": "hRNmqEHzL1597PVn",
+  "name": "Betterstack -> Zendesk Receiver",
+  "description": "Real-time receiver for Betterstack incident webhooks. Branches by timestamp inspection (started/acknowledged/resolved). Bearer token auth via X-Webhook-Auth header.",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "fd2895f9-73f5-4991-9bff-da20d55b9110",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        480
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "betterstack-incident",
+        "responseMode": "responseNode",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "webhookId": "59684cad-118e-4f97-b158-103a6cb46e5e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "OtDn9FiU0q4Fd8Ro",
+          "name": "Betterstack Webhook Auth"
+        }
+      }
+    },
+    {
+      "id": "76bb6c7c-9b9f-4e22-a087-be24374ddc5a",
+      "name": "Branch by Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        464
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "is-resolved",
+                    "leftValue": "={{ $json.body.data.attributes.resolved_at }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "resolved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "has-acked",
+                    "leftValue": "={{ $json.body.data.attributes.acknowledged_at }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEmpty",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "no-resolved",
+                    "leftValue": "={{ $json.body.data.attributes.resolved_at }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "empty",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "acknowledged"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "no-acked",
+                    "leftValue": "={{ $json.body.data.attributes.acknowledged_at }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "empty",
+                      "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "no-resolved-2",
+                    "leftValue": "={{ $json.body.data.attributes.resolved_at }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "empty",
+                      "singleValue": true
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "started"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none",
+          "allMatchingOutputs": false
+        }
+      }
+    },
+    {
+      "id": "c952b029-7163-4c10-bfee-71fec31416e2",
+      "name": "Find Open Ticket (Resolved)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "options": {
+          "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "19974326-ee79-4474-9e2c-c58f227942ff",
+      "name": "Resolved: Ticket Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-ticket-id",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      }
+    },
+    {
+      "id": "7c57ad88-243f-4783-bc0b-a1aaa3d7e39e",
+      "name": "Call Resolve Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "FXjwcoWpPhmv76ws"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "zendesk_ticket_id": "={{ String($('Find Open Ticket (Resolved)').item.json.id) }}",
+            "incident_id": "={{ $('Webhook').item.json.body.data.id }}",
+            "incident": "={{ $('Webhook').item.json.body.data.attributes }}"
+          },
+          "schema": [
+            {
+              "id": "zendesk_ticket_id",
+              "displayName": "zendesk_ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident",
+              "displayName": "incident",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "4536bce1-b879-48d7-9605-7d16c70d1b16",
+      "name": "Respond 200 (Resolved)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1344,
+        96
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"branch\": \"resolved\" } }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "1a95af1f-0d62-4117-9d16-af0785d338db",
+      "name": "Format Resolution Comment (Pre-create)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\\n');\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
+      }
+    },
+    {
+      "id": "989805e3-499c-49d4-9c06-ef9762b7da67",
+      "name": "Create Ticket (Already Resolved)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "description": "={{ $json.comment }}",
+        "jsonParameters": true,
+        "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"solved\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-resolved\", \"automated\"] }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "491eb785-3825-4427-b7e3-b588e76bdc6a",
+      "name": "Find Open Ticket (Ack)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        448,
+        480
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "options": {
+          "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c2fa7381-850f-4d4f-8b12-c436c3719f82",
+      "name": "Ack: Ticket Found and Not Acked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-ticket",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "no-acked-tag",
+              "leftValue": "={{ ($json.tags || []).includes(\"betterstack-acked\") }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      }
+    },
+    {
+      "id": "9739aaf4-0003-4534-b6c7-ab23a92110c4",
+      "name": "Update Ticket (Ack)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        896,
+        384
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $json.id }}",
+        "jsonParameters": true,
+        "updateFieldsJson": "={{ JSON.stringify({ tags: ($json.tags || []).concat([\"betterstack-acked\"]), comment: { body: \"Incident acknowledged at \" + ($('Webhook').item.json.body.data.attributes.acknowledged_at || \"unknown time\") + \" by \" + ($('Webhook').item.json.body.data.attributes.acknowledged_by || \"unknown\"), public: false } }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "2e577a11-2294-45d8-9bce-7179aa15c3d7",
+      "name": "Respond 200 (Ack)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"branch\": \"acknowledged\" } }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "218034a6-ca35-4a31-b916-680e7862a168",
+      "name": "Ack No-op (No Ticket or Already Acked)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        896,
+        576
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a60a0ce5-77a4-47d4-882c-9863653db233",
+      "name": "Find Editable Ticket (Started)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        448,
+        912
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "options": {
+          "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e49ad486-6ba3-42ae-9036-6b2a03037f0a",
+      "name": "Started: Editable Ticket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        912
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-editable-ticket",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      }
+    },
+    {
+      "id": "5c05aa10-1f7b-4950-82c1-99821d1c21e8",
+      "name": "Reopen Ticket",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        720
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $json.id }}",
+        "jsonParameters": true,
+        "updateFieldsJson": "={{ JSON.stringify({ status: \"open\", tags: ($json.tags || []).filter(function(t) { return t !== \"betterstack-resolved\"; }).concat([\"betterstack-open\"]), comment: { body: \"Incident reopened at \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown time\") + \".\", public: false } }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "c3c95967-39f2-46db-89bd-2d1a3b248ae9",
+      "name": "Respond 200 (Started)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1568,
+        912
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"branch\": \"started\" } }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "6a0ff4e3-aee0-4f3c-999b-82d613978706",
+      "name": "Find Any Ticket (Closed Lookup)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        896,
+        1008
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "options": {
+          "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "48b05c2a-be58-4dab-b3a5-642e9bdd23b7",
+      "name": "Closed Ticket Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        1008
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-closed-ticket",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      }
+    },
+    {
+      "id": "52d6bb0a-1c49-4834-ae41-12bdc8b1c8f4",
+      "name": "Create Ticket (Linked to Closed)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        912
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "description": "={{ \"Original ticket #\" + $json.id + \" auto-closed before this incident reopened. Continuing investigation here.\\n\\nMonitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
+        "jsonParameters": true,
+        "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"] }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "7070a06c-2d6f-47fc-afc7-0f3fbf68c61b",
+      "name": "Create Ticket (Fresh)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        1104
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "description": "={{ \"Monitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
+        "jsonParameters": true,
+        "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"] }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "bcbe21e7-6d49-4078-b118-a0b2db5ae0a3",
+      "name": "Sticky Note 2e1b9986",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        1168
+      ],
+      "parameters": {
+        "content": "## Betterstack -> Zendesk Receiver\n\n**Purpose**: Real-time webhook receiver for Betterstack incident events.\nMirrors incident lifecycle into Zendesk tickets via tag-based state.\n\n**Webhook URL**: `https://twofifteen.app.n8n.cloud/webhook/betterstack-incident`\n\n**Auth**: Built-in Webhook node `headerAuth`, backed by `httpHeaderAuth`\ncredential `Betterstack Webhook Auth` (header `X-Webhook-Auth`, value\n`Bearer <token>`). Mismatch returns HTTP 403 from the Webhook node itself.\n\n**Companion workflows**:\n- Resolve sub-workflow `FXjwcoWpPhmv76ws` (called for resolutions)\n- Polling reconciler (5-min fallback for missed resolution webhooks)",
+        "color": 4
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Branch by Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch by Event": {
+      "main": [
+        [
+          {
+            "node": "Find Open Ticket (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Open Ticket (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Editable Ticket (Started)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Ticket (Resolved)": {
+      "main": [
+        [
+          {
+            "node": "Resolved: Ticket Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolved: Ticket Found?": {
+      "main": [
+        [
+          {
+            "node": "Call Resolve Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Resolution Comment (Pre-create)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Resolve Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Resolution Comment (Pre-create)": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket (Already Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Ticket (Already Resolved)": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Ticket (Ack)": {
+      "main": [
+        [
+          {
+            "node": "Ack: Ticket Found and Not Acked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack: Ticket Found and Not Acked?": {
+      "main": [
+        [
+          {
+            "node": "Update Ticket (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ack No-op (No Ticket or Already Acked)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Ticket (Ack)": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack No-op (No Ticket or Already Acked)": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Editable Ticket (Started)": {
+      "main": [
+        [
+          {
+            "node": "Started: Editable Ticket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Started: Editable Ticket?": {
+      "main": [
+        [
+          {
+            "node": "Reopen Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Any Ticket (Closed Lookup)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reopen Ticket": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Started)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Any Ticket (Closed Lookup)": {
+      "main": [
+        [
+          {
+            "node": "Closed Ticket Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Closed Ticket Exists?": {
+      "main": [
+        [
+          {
+            "node": "Create Ticket (Linked to Closed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Ticket (Fresh)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Ticket (Linked to Closed)": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Started)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Ticket (Fresh)": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Started)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "pinData": null,
+  "versionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
+  "activeVersionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
+  "versionCounter": 15,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-05-09T23:32:01.732Z",
+      "createdAt": "2026-05-09T23:32:01.732Z",
+      "role": "workflow:owner",
+      "workflowId": "hRNmqEHzL1597PVn",
+      "projectId": "Clm6sSIH1kjqDh0n",
+      "project": {
+        "updatedAt": "2025-12-19T04:32:24.914Z",
+        "createdAt": "2025-12-19T04:32:20.268Z",
+        "id": "Clm6sSIH1kjqDh0n",
+        "name": "Robby Barnes <robby@215.tech>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-09T23:46:28.833Z",
+    "createdAt": "2026-05-09T23:46:28.833Z",
+    "versionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
+    "workflowId": "hRNmqEHzL1597PVn",
+    "nodes": [
+      {
+        "id": "fd2895f9-73f5-4991-9bff-da20d55b9110",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          480
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "betterstack-incident",
+          "responseMode": "responseNode",
+          "authentication": "headerAuth",
+          "options": {}
+        },
+        "webhookId": "59684cad-118e-4f97-b158-103a6cb46e5e",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "OtDn9FiU0q4Fd8Ro",
+            "name": "Betterstack Webhook Auth"
+          }
+        }
+      },
+      {
+        "id": "76bb6c7c-9b9f-4e22-a087-be24374ddc5a",
+        "name": "Branch by Event",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          224,
+          464
+        ],
+        "parameters": {
+          "mode": "rules",
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "leftValue": "",
+                    "caseSensitive": true,
+                    "typeValidation": "loose"
+                  },
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "id": "is-resolved",
+                      "leftValue": "={{ $json.body.data.attributes.resolved_at }}",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "string",
+                        "operation": "notEmpty",
+                        "singleValue": true
+                      }
+                    }
+                  ]
+                },
+                "renameOutput": true,
+                "outputKey": "resolved"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "leftValue": "",
+                    "caseSensitive": true,
+                    "typeValidation": "loose"
+                  },
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "id": "has-acked",
+                      "leftValue": "={{ $json.body.data.attributes.acknowledged_at }}",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "string",
+                        "operation": "notEmpty",
+                        "singleValue": true
+                      }
+                    },
+                    {
+                      "id": "no-resolved",
+                      "leftValue": "={{ $json.body.data.attributes.resolved_at }}",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "string",
+                        "operation": "empty",
+                        "singleValue": true
+                      }
+                    }
+                  ]
+                },
+                "renameOutput": true,
+                "outputKey": "acknowledged"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "leftValue": "",
+                    "caseSensitive": true,
+                    "typeValidation": "loose"
+                  },
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "id": "no-acked",
+                      "leftValue": "={{ $json.body.data.attributes.acknowledged_at }}",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "string",
+                        "operation": "empty",
+                        "singleValue": true
+                      }
+                    },
+                    {
+                      "id": "no-resolved-2",
+                      "leftValue": "={{ $json.body.data.attributes.resolved_at }}",
+                      "rightValue": "",
+                      "operator": {
+                        "type": "string",
+                        "operation": "empty",
+                        "singleValue": true
+                      }
+                    }
+                  ]
+                },
+                "renameOutput": true,
+                "outputKey": "started"
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "none",
+            "allMatchingOutputs": false
+          }
+        }
+      },
+      {
+        "id": "c952b029-7163-4c10-bfee-71fec31416e2",
+        "name": "Find Open Ticket (Resolved)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          448,
+          96
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "getAll",
+          "returnAll": false,
+          "limit": 1,
+          "options": {
+            "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+          }
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        },
+        "alwaysOutputData": true
+      },
+      {
+        "id": "19974326-ee79-4474-9e2c-c58f227942ff",
+        "name": "Resolved: Ticket Found?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          672,
+          96
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "has-ticket-id",
+                "leftValue": "={{ $json.id }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ]
+          },
+          "options": {
+            "looseTypeValidation": true
+          }
+        }
+      },
+      {
+        "id": "7c57ad88-243f-4783-bc0b-a1aaa3d7e39e",
+        "name": "Call Resolve Sub-workflow",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          1120,
+          0
+        ],
+        "parameters": {
+          "source": "database",
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "FXjwcoWpPhmv76ws"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "zendesk_ticket_id": "={{ String($('Find Open Ticket (Resolved)').item.json.id) }}",
+              "incident_id": "={{ $('Webhook').item.json.body.data.id }}",
+              "incident": "={{ $('Webhook').item.json.body.data.attributes }}"
+            },
+            "schema": [
+              {
+                "id": "zendesk_ticket_id",
+                "displayName": "zendesk_ticket_id",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              },
+              {
+                "id": "incident_id",
+                "displayName": "incident_id",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              },
+              {
+                "id": "incident",
+                "displayName": "incident",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "object"
+              }
+            ],
+            "matchingColumns": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "mode": "each",
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        }
+      },
+      {
+        "id": "4536bce1-b879-48d7-9605-7d16c70d1b16",
+        "name": "Respond 200 (Resolved)",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1344,
+          96
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { \"ok\": true, \"branch\": \"resolved\" } }}",
+          "options": {
+            "responseCode": 200
+          }
+        }
+      },
+      {
+        "id": "1a95af1f-0d62-4117-9d16-af0785d338db",
+        "name": "Format Resolution Comment (Pre-create)",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          896,
+          192
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "language": "javaScript",
+          "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\\n');\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
+        }
+      },
+      {
+        "id": "989805e3-499c-49d4-9c06-ef9762b7da67",
+        "name": "Create Ticket (Already Resolved)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          1120,
+          192
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "create",
+          "description": "={{ $json.comment }}",
+          "jsonParameters": true,
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"solved\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-resolved\", \"automated\"] }) }}"
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        }
+      },
+      {
+        "id": "491eb785-3825-4427-b7e3-b588e76bdc6a",
+        "name": "Find Open Ticket (Ack)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          448,
+          480
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "getAll",
+          "returnAll": false,
+          "limit": 1,
+          "options": {
+            "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+          }
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        },
+        "alwaysOutputData": true
+      },
+      {
+        "id": "c2fa7381-850f-4d4f-8b12-c436c3719f82",
+        "name": "Ack: Ticket Found and Not Acked?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          672,
+          480
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "has-ticket",
+                "leftValue": "={{ $json.id }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              },
+              {
+                "id": "no-acked-tag",
+                "leftValue": "={{ ($json.tags || []).includes(\"betterstack-acked\") }}",
+                "rightValue": false,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ]
+          },
+          "options": {
+            "looseTypeValidation": true
+          }
+        }
+      },
+      {
+        "id": "9739aaf4-0003-4534-b6c7-ab23a92110c4",
+        "name": "Update Ticket (Ack)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          896,
+          384
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "update",
+          "id": "={{ $json.id }}",
+          "jsonParameters": true,
+          "updateFieldsJson": "={{ JSON.stringify({ tags: ($json.tags || []).concat([\"betterstack-acked\"]), comment: { body: \"Incident acknowledged at \" + ($('Webhook').item.json.body.data.attributes.acknowledged_at || \"unknown time\") + \" by \" + ($('Webhook').item.json.body.data.attributes.acknowledged_by || \"unknown\"), public: false } }) }}"
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        }
+      },
+      {
+        "id": "2e577a11-2294-45d8-9bce-7179aa15c3d7",
+        "name": "Respond 200 (Ack)",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1120,
+          480
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { \"ok\": true, \"branch\": \"acknowledged\" } }}",
+          "options": {
+            "responseCode": 200
+          }
+        }
+      },
+      {
+        "id": "218034a6-ca35-4a31-b916-680e7862a168",
+        "name": "Ack No-op (No Ticket or Already Acked)",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          896,
+          576
+        ],
+        "parameters": {}
+      },
+      {
+        "id": "a60a0ce5-77a4-47d4-882c-9863653db233",
+        "name": "Find Editable Ticket (Started)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          448,
+          912
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "getAll",
+          "returnAll": false,
+          "limit": 1,
+          "options": {
+            "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+          }
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        },
+        "alwaysOutputData": true
+      },
+      {
+        "id": "e49ad486-6ba3-42ae-9036-6b2a03037f0a",
+        "name": "Started: Editable Ticket?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          672,
+          912
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "has-editable-ticket",
+                "leftValue": "={{ $json.id }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ]
+          },
+          "options": {
+            "looseTypeValidation": true
+          }
+        }
+      },
+      {
+        "id": "5c05aa10-1f7b-4950-82c1-99821d1c21e8",
+        "name": "Reopen Ticket",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          1344,
+          720
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "update",
+          "id": "={{ $json.id }}",
+          "jsonParameters": true,
+          "updateFieldsJson": "={{ JSON.stringify({ status: \"open\", tags: ($json.tags || []).filter(function(t) { return t !== \"betterstack-resolved\"; }).concat([\"betterstack-open\"]), comment: { body: \"Incident reopened at \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown time\") + \".\", public: false } }) }}"
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        }
+      },
+      {
+        "id": "c3c95967-39f2-46db-89bd-2d1a3b248ae9",
+        "name": "Respond 200 (Started)",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.5,
+        "position": [
+          1568,
+          912
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { \"ok\": true, \"branch\": \"started\" } }}",
+          "options": {
+            "responseCode": 200
+          }
+        }
+      },
+      {
+        "id": "6a0ff4e3-aee0-4f3c-999b-82d613978706",
+        "name": "Find Any Ticket (Closed Lookup)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          896,
+          1008
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "getAll",
+          "returnAll": false,
+          "limit": 1,
+          "options": {
+            "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id }}"
+          }
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        },
+        "alwaysOutputData": true
+      },
+      {
+        "id": "48b05c2a-be58-4dab-b3a5-642e9bdd23b7",
+        "name": "Closed Ticket Exists?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          1120,
+          1008
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "has-closed-ticket",
+                "leftValue": "={{ $json.id }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ]
+          },
+          "options": {
+            "looseTypeValidation": true
+          }
+        }
+      },
+      {
+        "id": "52d6bb0a-1c49-4834-ae41-12bdc8b1c8f4",
+        "name": "Create Ticket (Linked to Closed)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          1344,
+          912
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "create",
+          "description": "={{ \"Original ticket #\" + $json.id + \" auto-closed before this incident reopened. Continuing investigation here.\\n\\nMonitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
+          "jsonParameters": true,
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"] }) }}"
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        }
+      },
+      {
+        "id": "7070a06c-2d6f-47fc-afc7-0f3fbf68c61b",
+        "name": "Create Ticket (Fresh)",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          1344,
+          1104
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "create",
+          "description": "={{ \"Monitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
+          "jsonParameters": true,
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"] }) }}"
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        }
+      },
+      {
+        "id": "bcbe21e7-6d49-4078-b118-a0b2db5ae0a3",
+        "name": "Sticky Note 2e1b9986",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          1168
+        ],
+        "parameters": {
+          "content": "## Betterstack -> Zendesk Receiver\n\n**Purpose**: Real-time webhook receiver for Betterstack incident events.\nMirrors incident lifecycle into Zendesk tickets via tag-based state.\n\n**Webhook URL**: `https://twofifteen.app.n8n.cloud/webhook/betterstack-incident`\n\n**Auth**: Built-in Webhook node `headerAuth`, backed by `httpHeaderAuth`\ncredential `Betterstack Webhook Auth` (header `X-Webhook-Auth`, value\n`Bearer <token>`). Mismatch returns HTTP 403 from the Webhook node itself.\n\n**Companion workflows**:\n- Resolve sub-workflow `FXjwcoWpPhmv76ws` (called for resolutions)\n- Polling reconciler (5-min fallback for missed resolution webhooks)",
+          "color": 4
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Branch by Event",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Branch by Event": {
+        "main": [
+          [
+            {
+              "node": "Find Open Ticket (Resolved)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Find Open Ticket (Ack)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Find Editable Ticket (Started)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Open Ticket (Resolved)": {
+        "main": [
+          [
+            {
+              "node": "Resolved: Ticket Found?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resolved: Ticket Found?": {
+        "main": [
+          [
+            {
+              "node": "Call Resolve Sub-workflow",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Format Resolution Comment (Pre-create)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Call Resolve Sub-workflow": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Resolved)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Resolution Comment (Pre-create)": {
+        "main": [
+          [
+            {
+              "node": "Create Ticket (Already Resolved)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Ticket (Already Resolved)": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Resolved)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Open Ticket (Ack)": {
+        "main": [
+          [
+            {
+              "node": "Ack: Ticket Found and Not Acked?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ack: Ticket Found and Not Acked?": {
+        "main": [
+          [
+            {
+              "node": "Update Ticket (Ack)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Ack No-op (No Ticket or Already Acked)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Ticket (Ack)": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Ack)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ack No-op (No Ticket or Already Acked)": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Ack)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Editable Ticket (Started)": {
+        "main": [
+          [
+            {
+              "node": "Started: Editable Ticket?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Started: Editable Ticket?": {
+        "main": [
+          [
+            {
+              "node": "Reopen Ticket",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Find Any Ticket (Closed Lookup)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reopen Ticket": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Started)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Any Ticket (Closed Lookup)": {
+        "main": [
+          [
+            {
+              "node": "Closed Ticket Exists?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Closed Ticket Exists?": {
+        "main": [
+          [
+            {
+              "node": "Create Ticket (Linked to Closed)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Create Ticket (Fresh)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Ticket (Linked to Closed)": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Started)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Ticket (Fresh)": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 (Started)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Robby Barnes",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-09T23:46:29.128Z",
+        "id": 49,
+        "workflowId": "hRNmqEHzL1597PVn",
+        "versionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
+        "event": "activated",
+        "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
+      },
+      {
+        "createdAt": "2026-05-09T23:46:28.999Z",
+        "id": 48,
+        "workflowId": "hRNmqEHzL1597PVn",
+        "versionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
+        "event": "deactivated",
+        "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
+      }
+    ]
+  }
+}

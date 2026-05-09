@@ -21,8 +21,22 @@ const COMMENT_PUBLIC = true; // matches existing Zapier zap; resolution comment 
 const RESOLVE_SUBWORKFLOW_ID = 'FXjwcoWpPhmv76ws'; // resolve sub-workflow (Phase 1)
 
 // ===========================================================================
-// TRIGGER + AUTH GATE
+// TRIGGER (auth handled natively by Webhook node via Header Auth credential)
 // ===========================================================================
+//
+// Auth approach:
+//   The Webhook node uses n8n's built-in `headerAuth` authentication, backed
+//   by an `httpHeaderAuth` credential named "Betterstack Webhook Auth"
+//   (header name `X-Webhook-Auth`, value `Bearer <token>`).
+//
+// Why not `$env.BETTERSTACK_WEBHOOK_TOKEN` + an IF auth gate?
+//   n8n Cloud does NOT allow setting custom env vars on the host process —
+//   `$env` only resolves variables baked into the container image. The
+//   credential pattern is the supported alternative on Cloud and has the
+//   bonus of being enforced inside the Webhook node itself, so unauthorized
+//   requests are rejected with HTTP 403 *before* the workflow even fires
+//   (no execution log noise, no risk of the workflow leaking on
+//   misconfiguration).
 
 const webhookTrigger = trigger({
   type: 'n8n-nodes-base.webhook',
@@ -33,8 +47,10 @@ const webhookTrigger = trigger({
       httpMethod: 'POST',
       path: 'betterstack-incident',
       responseMode: 'responseNode',
+      authentication: 'headerAuth',
       options: {},
     },
+    credentials: { httpHeaderAuth: newCredential('Betterstack Webhook Auth') },
     position: [240, 600],
   },
   output: [
@@ -58,49 +74,6 @@ const webhookTrigger = trigger({
       },
     },
   ],
-});
-
-const verifyBearerToken = ifElse({
-  version: 2.3,
-  config: {
-    name: 'Verify Bearer Token',
-    parameters: {
-      conditions: {
-        options: {
-          version: 2,
-          leftValue: '',
-          caseSensitive: true,
-          typeValidation: 'strict',
-        },
-        combinator: 'and',
-        conditions: [
-          {
-            id: 'auth-match',
-            leftValue: expr('{{ ($json.headers["x-webhook-auth"] || "").trim() }}'),
-            rightValue: expr('{{ ("Bearer " + $env.BETTERSTACK_WEBHOOK_TOKEN).trim() }}'),
-            operator: { type: 'string', operation: 'equals' },
-          },
-        ],
-      },
-      options: {},
-    },
-    position: [480, 600],
-  },
-});
-
-const respondUnauthorized = node({
-  type: 'n8n-nodes-base.respondToWebhook',
-  version: 1.5,
-  config: {
-    name: 'Respond 401',
-    parameters: {
-      respondWith: 'json',
-      responseBody: '={{ { "error": "unauthorized" } }}',
-      options: { responseCode: 401 },
-    },
-    position: [720, 760],
-  },
-  output: [{ error: 'unauthorized' }],
 });
 
 // ===========================================================================
@@ -260,6 +233,12 @@ const findOpenTicketResolved = node({
       },
     },
     credentials: { zendeskApi: newCredential('Zendesk account') },
+    // Required so the IF "Resolved: Ticket Found?" downstream still fires
+    // when the search returns zero results — n8n drops nodes whose input
+    // arrives with 0 items unless this is set. With alwaysOutputData on,
+    // n8n emits a single empty object `{}` on no-match, the IF evaluates
+    // `$json.id > 0` as false (undefined), and routes to the FALSE branch.
+    alwaysOutputData: true,
     position: [960, 240],
   },
   output: [
@@ -305,8 +284,12 @@ const callResolveSubworkflow = node({
       workflowInputs: {
         mappingMode: 'defineBelow',
         value: {
+          // Wrap in String() — Zendesk's ticket id arrives as a JS number
+          // (e.g. 35019) and the sub-workflow's input schema declares
+          // `zendesk_ticket_id` as a string. Without coercion the
+          // ExecuteWorkflow node throws ExpressionError before the call.
           zendesk_ticket_id: expr(
-            '={{ $(\'Find Open Ticket (Resolved)\').item.json.id }}'
+            "={{ String($('Find Open Ticket (Resolved)').item.json.id) }}"
           ),
           incident_id: expr("={{ $('Webhook').item.json.body.data.id }}"),
           incident: expr("={{ $('Webhook').item.json.body.data.attributes }}"),
@@ -421,6 +404,7 @@ const findOpenTicketAck = node({
       },
     },
     credentials: { zendeskApi: newCredential('Zendesk account') },
+    alwaysOutputData: true,
     position: [960, 600],
   },
   output: [
@@ -515,6 +499,7 @@ const findEditableTicket = node({
       },
     },
     credentials: { zendeskApi: newCredential('Zendesk account') },
+    alwaysOutputData: true,
     position: [960, 960],
   },
   output: [
@@ -582,6 +567,7 @@ const findClosedTicket = node({
       },
     },
     credentials: { zendeskApi: newCredential('Zendesk account') },
+    alwaysOutputData: true,
     position: [1440, 1080],
   },
   output: [
@@ -695,8 +681,11 @@ const purposeSticky = sticky(
     '**Purpose**: Real-time webhook receiver for Betterstack incident events.\n' +
     'Mirrors incident lifecycle into Zendesk tickets via tag-based state.\n\n' +
     '**Webhook URL**: `https://twofifteen.app.n8n.cloud/webhook/betterstack-incident`\n\n' +
-    '**Auth**: `X-Webhook-Auth: Bearer <token>` header. Token in n8n env var\n' +
-    '`BETTERSTACK_WEBHOOK_TOKEN`. Mismatch returns 401 + `{"error":"unauthorized"}`.\n\n' +
+    '**Auth**: Built-in Webhook node `headerAuth`, backed by `httpHeaderAuth`\n' +
+    'credential `Betterstack Webhook Auth` (header `X-Webhook-Auth`, value\n' +
+    '`Bearer <token>`). Mismatch returns HTTP 403 from the Webhook node itself,\n' +
+    'before the workflow fires. n8n Cloud does not expose `$env`, so the\n' +
+    'credential pattern is the only viable option here.\n\n' +
     '**Companion workflows**:\n' +
     '- Resolve sub-workflow `' + RESOLVE_SUBWORKFLOW_ID + '` (called for resolutions)\n' +
     '- Polling reconciler (5-min fallback for missed resolution webhooks)\n\n' +
@@ -799,7 +788,8 @@ const todoSticky = sticky(
     '- `PRIORITY` — currently `"high"` per spec default\n' +
     '- `COMMENT_PUBLIC` — currently `true` (matches Zapier zap)\n' +
     '- `RESOLVE_SUBWORKFLOW_ID` — `' + RESOLVE_SUBWORKFLOW_ID + '` (Phase 1 deployment)\n\n' +
-    'Also set the env var `BETTERSTACK_WEBHOOK_TOKEN` in n8n.',
+    'Auth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\n' +
+    'in n8n with the bearer token wired into Betterstack\'s outgoing webhook.',
   [],
   { color: 6 }
 );
@@ -811,40 +801,36 @@ const todoSticky = sticky(
 export default workflow('betterstack-receiver', 'Betterstack → Zendesk Receiver')
   .add(webhookTrigger)
   .to(
-    verifyBearerToken
-      .onFalse(respondUnauthorized)
-      .onTrue(
-        branchByEvent
-          .onCase(
-            0,
-            findOpenTicketResolved.to(
-              resolvedTicketFound
-                .onTrue(callResolveSubworkflow.to(respondResolved))
-                .onFalse(formatCommentForCreate.to(createSolvedTicket.to(respondResolved)))
+    branchByEvent
+      .onCase(
+        0,
+        findOpenTicketResolved.to(
+          resolvedTicketFound
+            .onTrue(callResolveSubworkflow.to(respondResolved))
+            .onFalse(formatCommentForCreate.to(createSolvedTicket.to(respondResolved)))
+        )
+      )
+      .onCase(
+        1,
+        findOpenTicketAck.to(
+          ackTicketFoundAndUnacked
+            .onTrue(updateTicketAck.to(respondAck))
+            .onFalse(ackNoOp.to(respondAck))
+        )
+      )
+      .onCase(
+        2,
+        findEditableTicket.to(
+          startedTicketEditable
+            .onTrue(reopenTicket.to(respondStarted))
+            .onFalse(
+              findClosedTicket.to(
+                closedTicketExists
+                  .onTrue(createLinkedTicket.to(respondStarted))
+                  .onFalse(createFreshTicket.to(respondStarted))
+              )
             )
-          )
-          .onCase(
-            1,
-            findOpenTicketAck.to(
-              ackTicketFoundAndUnacked
-                .onTrue(updateTicketAck.to(respondAck))
-                .onFalse(ackNoOp.to(respondAck))
-            )
-          )
-          .onCase(
-            2,
-            findEditableTicket.to(
-              startedTicketEditable
-                .onTrue(reopenTicket.to(respondStarted))
-                .onFalse(
-                  findClosedTicket.to(
-                    closedTicketExists
-                      .onTrue(createLinkedTicket.to(respondStarted))
-                      .onFalse(createFreshTicket.to(respondStarted))
-                  )
-                )
-            )
-          )
+        )
       )
   )
   .add(purposeSticky)

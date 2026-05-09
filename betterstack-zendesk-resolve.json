@@ -1,0 +1,259 @@
+{
+  "updatedAt": "2026-05-09T22:58:54.298Z",
+  "createdAt": "2026-05-09T22:58:54.298Z",
+  "id": "FXjwcoWpPhmv76ws",
+  "name": "Betterstack Resolve Sub-workflow",
+  "description": "Shared resolution logic for Betterstack incidents. Called by webhook receiver and polling reconciler. Idempotent via betterstack-resolved sentinel tag.",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "4e306659-060d-493b-89f4-fb7a33e1d382",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "zendesk_ticket_id",
+              "type": "string"
+            },
+            {
+              "name": "incident_id",
+              "type": "string"
+            },
+            {
+              "name": "incident",
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fc648da7-96e3-482c-8eb3-e7bd398fa4be",
+      "name": "Get Zendesk Ticket",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "get",
+        "id": "={{ $json.zendesk_ticket_id }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "c105dda0-d7bb-4c6d-8581-9607108922de",
+      "name": "Already Resolved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-resolved-tag",
+              "leftValue": "={{ $json.tags.includes(\"betterstack-resolved\") }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fc902f00-f9d6-42a6-94ca-6c10adc34ef0",
+      "name": "Already Resolved (No-op)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "3614e536-46a8-4b7f-ab2d-6a7e4a98e764",
+      "name": "Compute Downtime + Format Comment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const ticket = $('Get Zendesk Ticket').item.json;\nconst incident = $('Execute Workflow Trigger').item.json.incident;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\nconst days = Math.floor(diffMs / 86400000);\nconst hours = Math.floor((diffMs % 86400000) / 3600000);\nconst minutes = Math.floor((diffMs % 3600000) / 60000);\nconst seconds = Math.floor((diffMs % 60000) / 1000);\n\nconst fmt = (d) => d.toLocaleString('en-GB', {\n  day: 'numeric', month: 'short', year: 'numeric',\n  hour: 'numeric', minute: '2-digit', hour12: true,\n  timeZone: 'UTC',\n}).replace(',', ' at') + ' UTC';\n\nconst cause = incident.cause || 'Not specified';\nconst incidentId = $('Execute Workflow Trigger').item.json.incident_id\n  || $('Execute Workflow Trigger').item.json.zendesk_ticket_id;\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds',\n];\nconst comment = lines.join('\\n');\n\nconst newTags = ticket.tags\n  .filter((t) => t !== 'betterstack-open')\n  .concat(['betterstack-resolved']);\n\nreturn [{ json: { comment: comment, newTags: newTags, ticket_id: ticket.id } }];"
+      }
+    },
+    {
+      "id": "d03fa2e7-0ea8-4cec-9522-caa957ce1143",
+      "name": "Update Zendesk Ticket",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $json.ticket_id }}",
+        "jsonParameters": true,
+        "updateFieldsJson": "={{ JSON.stringify({ status: \"solved\", tags: $json.newTags, comment: { body: $json.comment, public: true }, custom_fields: [ { id: 0, value: \"TODO_CATEGORY_VALUE\" }, { id: 0, value: \"TODO_TYPE_VALUE\" } ] }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "1b69d1b1-4f68-4b75-8838-6a800e8d43a6",
+      "name": "Sticky Note 48f543e0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        256
+      ],
+      "parameters": {
+        "content": "## Betterstack Resolve Sub-workflow\n\n**Purpose**: Shared resolution logic for Betterstack incidents. Called by:\n- `betterstack-zendesk-receiver` (real-time webhook receiver)\n- `betterstack-zendesk-poller` (5-min reconciler fallback)\n\n**Inputs** (Execute Workflow Trigger):\n- `zendesk_ticket_id` (string) \u2014 the Zendesk ticket to resolve\n- `incident_id` (string) \u2014 the Betterstack incident ID (for the comment)\n- `incident` (object) \u2014 the full Betterstack `data.attributes` payload\n  (must contain `name`, `cause`, `started_at`, `resolved_at`)\n\n**Idempotency**: First node fetches the ticket and the IF gate checks\nfor the `betterstack-resolved` tag. If present \u2192 no-op. If absent \u2192 run\nthe resolve flow and the Zendesk update appends `betterstack-resolved`\nto the tags as the sentinel. This makes webhook retries and webhook/poller\nraces safe.\n\n**Tag mutations** (computed in the Code node, applied as a full replacement):\n- removes `betterstack-open`\n- adds `betterstack-resolved`\n- preserves all other existing tags",
+        "color": 4
+      }
+    },
+    {
+      "id": "2adb92fa-758c-4159-94ef-b1b14331c57c",
+      "name": "Sticky Note ab4956cd",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        448,
+        256
+      ],
+      "parameters": {
+        "content": "## TODOs before activation\n\nEdit constants at the top of `resolve-subworkflow.workflow.ts`:\n\n- `CATEGORY_FIELD_ID` \u2014 Zendesk custom field ID for category\n- `CATEGORY_VALUE` \u2014 value to write to that field on resolution\n- `TYPE_FIELD_ID` \u2014 Zendesk custom field ID for type\n- `TYPE_VALUE` \u2014 value to write to that field on resolution\n- `COMMENT_PUBLIC` \u2014 currently `true` (matches Zapier zap). Flip to `false`\n  if the resolution comment should be an internal note.\n\nAfter editing, re-validate and `mcp__n8n-mcp__update_workflow` to redeploy.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Zendesk Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Zendesk Ticket": {
+      "main": [
+        [
+          {
+            "node": "Already Resolved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Resolved?": {
+      "main": [
+        [
+          {
+            "node": "Already Resolved (No-op)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Compute Downtime + Format Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Downtime + Format Comment": {
+      "main": [
+        [
+          {
+            "node": "Update Zendesk Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "pinData": null,
+  "versionId": "33c12f85-4b1e-4767-8ef6-2966dc0addd4",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-05-09T22:58:54.301Z",
+      "createdAt": "2026-05-09T22:58:54.301Z",
+      "role": "workflow:owner",
+      "workflowId": "FXjwcoWpPhmv76ws",
+      "projectId": "Clm6sSIH1kjqDh0n",
+      "project": {
+        "updatedAt": "2025-12-19T04:32:24.914Z",
+        "createdAt": "2025-12-19T04:32:20.268Z",
+        "id": "Clm6sSIH1kjqDh0n",
+        "name": "Robby Barnes <robby@215.tech>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": null
+}

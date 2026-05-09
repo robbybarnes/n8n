@@ -76,8 +76,8 @@ const verifyBearerToken = ifElse({
         conditions: [
           {
             id: 'auth-match',
-            leftValue: expr('{{ $json.headers["x-webhook-auth"] }}'),
-            rightValue: expr('{{ "Bearer " + $env.BETTERSTACK_WEBHOOK_TOKEN }}'),
+            leftValue: expr('{{ ($json.headers["x-webhook-auth"] || "").trim() }}'),
+            rightValue: expr('{{ ("Bearer " + $env.BETTERSTACK_WEBHOOK_TOKEN).trim() }}'),
             operator: { type: 'string', operation: 'equals' },
           },
         ],
@@ -178,7 +178,7 @@ const branchByEvent = switchCase({
           },
         ],
       },
-      options: { fallbackOutput: 'none' },
+      options: { fallbackOutput: 'none', allMatchingOutputs: false },
     },
     position: [720, 600],
   },
@@ -351,6 +351,11 @@ const formatCommentForCreate = node({
 
 // JSON.stringify-wrapped expression — special chars in placeholders produce
 // valid JS string literals when assembled at SDK build time.
+// Note: NO `comment` field here. Zendesk auto-creates the first comment from
+// the `description` parameter on the Create node, so passing both would
+// produce a duplicate first comment on the ticket. The first comment defaults
+// to public, matching the prior `COMMENT_PUBLIC = true` behavior. (Constant
+// retained for documentation / future re-use.)
 const createSolvedAdditionalFieldsExpression =
   '={{ JSON.stringify({ subject: "[Betterstack] " + $(\'Webhook\').item.json.body.data.attributes.name + " is down", status: "solved", priority: ' +
   JSON.stringify(PRIORITY) +
@@ -358,9 +363,7 @@ const createSolvedAdditionalFieldsExpression =
   JSON.stringify(GROUP_ID) +
   ', requester: { email: ' +
   JSON.stringify(REQUESTER_EMAIL) +
-  ' }, tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-resolved", "automated"], comment: { body: $json.comment, public: ' +
-  (COMMENT_PUBLIC ? 'true' : 'false') +
-  ' } }) }}';
+  ' }, tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-resolved", "automated"] }) }}';
 
 const createSolvedTicket = node({
   type: 'n8n-nodes-base.zendesk',
@@ -762,6 +765,32 @@ const reopenSticky = sticky(
   { color: 5 }
 );
 
+const createNodeBodySticky = sticky(
+  '## Create-node Body Construction\n\n' +
+    '**Description vs Comment**: Zendesk\'s ticket-create API auto-creates the\n' +
+    'first ticket comment from the `description` parameter when no explicit\n' +
+    '`comment` is provided. Passing BOTH `description` and `comment` produces\n' +
+    'a duplicate first comment.\n\n' +
+    'Rule applied here:\n' +
+    '- **Fresh + Linked + Solved creates** → set `description` only. No `comment`\n' +
+    '  inside `additionalFieldsJson`.\n' +
+    '- **Updates** (ack, reopen, resolve) → set `comment` with `public: false`.\n' +
+    '  Updates do not have a `description` parameter.\n\n' +
+    '**Newline handling**: The fresh-ticket / linked-ticket descriptions are\n' +
+    'built via raw string concatenation in expressions — `"\\n"` literals end\n' +
+    'up as actual newline characters in the final string. Zendesk\'s\n' +
+    '`description` parameter accepts literal newlines, so no JSON wrapping is\n' +
+    'needed. The solved-ticket path uses `description: $json.comment` where\n' +
+    '`$json.comment` already contains literal newlines from the Code node.\n\n' +
+    '**If we ever switch to passing description inside `additionalFieldsJson`**\n' +
+    '(i.e. as a JSON-encoded body), the description text MUST be wrapped in\n' +
+    '`JSON.stringify` to escape special chars. Today\'s structure avoids this\n' +
+    'because `description` is a top-level node parameter, not part of the JSON\n' +
+    'body.',
+  [],
+  { color: 5 }
+);
+
 const todoSticky = sticky(
   '## TODOs Before Activation\n\n' +
     'Edit constants at the top of `receiver.workflow.ts`:\n\n' +
@@ -823,4 +852,5 @@ export default workflow('betterstack-receiver', 'Betterstack → Zendesk Receive
   .add(ackTradeoffSticky)
   .add(resolvedEdgeSticky)
   .add(reopenSticky)
+  .add(createNodeBodySticky)
   .add(todoSticky);

@@ -219,6 +219,14 @@ return [{ json: { comment: comment, incident_id: incidentId, incident: incident 
 // RESOLVED BRANCH (output 0)
 // ===========================================================================
 
+// Shared search-query expression — used identically by attempts 1, 2, and 3.
+const resolvedSearchQueryExpr =
+  '={{ "tags:betterstack-incident-" + $(\'Webhook\').item.json.body.data.id + " status<closed" }}';
+
+// alwaysOutputData rationale (applies to all three search attempts): the IF
+// downstream needs an item even when the search returns 0 results, so it can
+// route to the FALSE branch. Without alwaysOutputData, n8n drops the IF input
+// and the workflow halts on this branch.
 const findOpenTicketResolved = node({
   type: 'n8n-nodes-base.zendesk',
   version: 1,
@@ -229,18 +237,9 @@ const findOpenTicketResolved = node({
       operation: 'getAll',
       returnAll: false,
       limit: 1,
-      options: {
-        query: expr(
-          '={{ "tags:betterstack-incident-" + $(\'Webhook\').item.json.body.data.id + " status<closed" }}'
-        ),
-      },
+      options: { query: expr(resolvedSearchQueryExpr) },
     },
     credentials: { zendeskApi: newCredential('Zendesk account') },
-    // Required so the IF "Resolved: Ticket Found?" downstream still fires
-    // when the search returns zero results — n8n drops nodes whose input
-    // arrives with 0 items unless this is set. With alwaysOutputData on,
-    // n8n emits a single empty object `{}` on no-match, the IF evaluates
-    // `$json.id > 0` as false (undefined), and routes to the FALSE branch.
     alwaysOutputData: true,
     position: [960, 240],
   },
@@ -275,6 +274,147 @@ const resolvedTicketFound = ifElse({
     position: [1200, 240],
   },
 });
+
+// --- Retry attempt 2 (after 5s wait) -------------------------------------
+// Race-condition mitigation: the started webhook may have created the ticket
+// only seconds before the resolved webhook fires, and Zendesk's search index
+// can take 10–30s to catch up. A single search returning 0 results would
+// fall through to the pre-create path and produce a duplicate ticket. The
+// retry chain re-checks at +5s and +10s before giving up.
+const waitFiveSeconds = node({
+  type: 'n8n-nodes-base.wait',
+  version: 1.1,
+  config: {
+    name: 'Wait 5s',
+    parameters: {
+      resume: 'timeInterval',
+      amount: 5,
+      unit: 'seconds',
+    },
+    position: [1440, 240],
+  },
+  output: [{}],
+});
+
+const findOpenTicketResolved2 = node({
+  type: 'n8n-nodes-base.zendesk',
+  version: 1,
+  config: {
+    name: 'Find Open Ticket (Resolved) Retry 2',
+    parameters: {
+      resource: 'ticket',
+      operation: 'getAll',
+      returnAll: false,
+      limit: 1,
+      options: { query: expr(resolvedSearchQueryExpr) },
+    },
+    credentials: { zendeskApi: newCredential('Zendesk account') },
+    alwaysOutputData: true,
+    position: [1680, 240],
+  },
+  output: [
+    {
+      id: 12345,
+      status: 'open',
+      tags: ['betterstack-incident-inc-abc-123', 'betterstack-open', 'automated'],
+    },
+  ],
+});
+
+const resolvedTicketFound2 = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Resolved: Ticket Found? Retry 2',
+    parameters: {
+      conditions: {
+        options: { version: 2, leftValue: '', caseSensitive: true, typeValidation: 'strict' },
+        combinator: 'and',
+        conditions: [
+          {
+            id: 'has-ticket-id-2',
+            leftValue: expr('{{ $json.id }}'),
+            rightValue: 0,
+            operator: { type: 'number', operation: 'gt' },
+          },
+        ],
+      },
+      options: { looseTypeValidation: true },
+    },
+    position: [1920, 240],
+  },
+});
+
+// --- Retry attempt 3 (after additional 10s wait) ---------------------------
+const waitTenSeconds = node({
+  type: 'n8n-nodes-base.wait',
+  version: 1.1,
+  config: {
+    name: 'Wait 10s',
+    parameters: {
+      resume: 'timeInterval',
+      amount: 10,
+      unit: 'seconds',
+    },
+    position: [2160, 240],
+  },
+  output: [{}],
+});
+
+const findOpenTicketResolved3 = node({
+  type: 'n8n-nodes-base.zendesk',
+  version: 1,
+  config: {
+    name: 'Find Open Ticket (Resolved) Retry 3',
+    parameters: {
+      resource: 'ticket',
+      operation: 'getAll',
+      returnAll: false,
+      limit: 1,
+      options: { query: expr(resolvedSearchQueryExpr) },
+    },
+    credentials: { zendeskApi: newCredential('Zendesk account') },
+    alwaysOutputData: true,
+    position: [2400, 240],
+  },
+  output: [
+    {
+      id: 12345,
+      status: 'open',
+      tags: ['betterstack-incident-inc-abc-123', 'betterstack-open', 'automated'],
+    },
+  ],
+});
+
+const resolvedTicketFound3 = ifElse({
+  version: 2.3,
+  config: {
+    name: 'Resolved: Ticket Found? Retry 3',
+    parameters: {
+      conditions: {
+        options: { version: 2, leftValue: '', caseSensitive: true, typeValidation: 'strict' },
+        combinator: 'and',
+        conditions: [
+          {
+            id: 'has-ticket-id-3',
+            leftValue: expr('{{ $json.id }}'),
+            rightValue: 0,
+            operator: { type: 'number', operation: 'gt' },
+          },
+        ],
+      },
+      options: { looseTypeValidation: true },
+    },
+    position: [2640, 240],
+  },
+});
+
+// Three Execute-Workflow nodes — one per retry attempt. Each references its
+// matching upstream search node by name so `String($('<source>').item.json.id)`
+// resolves to the ticket id from the attempt that actually found it. Three
+// separate nodes (rather than convergence onto one) keeps the visual flow
+// linear and avoids the awkward multi-parent + cross-branch reference problem.
+// We can't extract a builder function — the SDK forbids function declarations
+// at workflow scope — so the parameters block is duplicated literally.
 
 const callResolveSubworkflow = node({
   type: 'n8n-nodes-base.executeWorkflow',
@@ -314,6 +454,74 @@ const callResolveSubworkflow = node({
   output: [{ resolved: true }],
 });
 
+const callResolveSubworkflow2 = node({
+  type: 'n8n-nodes-base.executeWorkflow',
+  version: 1.3,
+  config: {
+    name: 'Call Resolve Sub-workflow Retry 2',
+    parameters: {
+      source: 'database',
+      workflowId: { __rl: true, mode: 'id', value: RESOLVE_SUBWORKFLOW_ID },
+      workflowInputs: {
+        mappingMode: 'defineBelow',
+        value: {
+          zendesk_ticket_id: expr(
+            "={{ String($('Find Open Ticket (Resolved) Retry 2').item.json.id) }}"
+          ),
+          incident_id: expr("={{ $('Webhook').item.json.body.data.id }}"),
+          incident: expr("={{ $('Webhook').item.json.body.data.attributes }}"),
+        },
+        schema: [
+          { id: 'zendesk_ticket_id', displayName: 'zendesk_ticket_id', required: true, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'incident_id', displayName: 'incident_id', required: true, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'incident', displayName: 'incident', required: true, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'object' },
+        ],
+        matchingColumns: [],
+        attemptToConvertTypes: false,
+        convertFieldsToString: true,
+      },
+      mode: 'each',
+      options: { waitForSubWorkflow: true },
+    },
+    position: [1920, 120],
+  },
+  output: [{ resolved: true }],
+});
+
+const callResolveSubworkflow3 = node({
+  type: 'n8n-nodes-base.executeWorkflow',
+  version: 1.3,
+  config: {
+    name: 'Call Resolve Sub-workflow Retry 3',
+    parameters: {
+      source: 'database',
+      workflowId: { __rl: true, mode: 'id', value: RESOLVE_SUBWORKFLOW_ID },
+      workflowInputs: {
+        mappingMode: 'defineBelow',
+        value: {
+          zendesk_ticket_id: expr(
+            "={{ String($('Find Open Ticket (Resolved) Retry 3').item.json.id) }}"
+          ),
+          incident_id: expr("={{ $('Webhook').item.json.body.data.id }}"),
+          incident: expr("={{ $('Webhook').item.json.body.data.attributes }}"),
+        },
+        schema: [
+          { id: 'zendesk_ticket_id', displayName: 'zendesk_ticket_id', required: true, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'incident_id', displayName: 'incident_id', required: true, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'string' },
+          { id: 'incident', displayName: 'incident', required: true, defaultMatch: false, display: true, canBeUsedToMatch: true, type: 'object' },
+        ],
+        matchingColumns: [],
+        attemptToConvertTypes: false,
+        convertFieldsToString: true,
+      },
+      mode: 'each',
+      options: { waitForSubWorkflow: true },
+    },
+    position: [2640, 120],
+  },
+  output: [{ resolved: true }],
+});
+
 const formatCommentForCreate = node({
   type: 'n8n-nodes-base.code',
   version: 2,
@@ -324,7 +532,7 @@ const formatCommentForCreate = node({
       language: 'javaScript',
       jsCode: formatResolutionCommentJs,
     },
-    position: [1440, 360],
+    position: [2880, 360],
   },
   output: [
     {
@@ -375,7 +583,7 @@ const createSolvedTicket = node({
       additionalFieldsJson: expr(createSolvedAdditionalFieldsExpression),
     },
     credentials: { zendeskApi: newCredential('Zendesk account') },
-    position: [1680, 360],
+    position: [3120, 360],
   },
   output: [
     { id: 99999, status: 'solved', tags: ['betterstack-incident-inc-abc-123', 'betterstack-resolved', 'automated'] },
@@ -392,7 +600,7 @@ const respondResolved = node({
       responseBody: '={{ { "ok": true, "branch": "resolved" } }}',
       options: { responseCode: 200 },
     },
-    position: [1920, 240],
+    position: [3360, 240],
   },
   output: [{ ok: true, branch: 'resolved' }],
 });
@@ -758,15 +966,24 @@ const ackTradeoffSticky = sticky(
 );
 
 const resolvedEdgeSticky = sticky(
-  '## Edge Case: Resolved Without Create\n\n' +
-    'If the `resolved` webhook arrives but no open ticket exists (the `started`\n' +
-    'webhook was dropped), the FALSE branch creates the ticket directly in\n' +
-    '`solved` state with the resolution comment baked in.\n\n' +
+  '## Edge Case: Resolved Without Create + Retry Chain\n\n' +
+    '**Retry-with-backoff (3 attempts)**: Zendesk search is eventually\n' +
+    'consistent. If `started` fires at T+0 and creates a ticket, then\n' +
+    '`resolved` fires at T+13s, the search index may not yet contain the\n' +
+    'new ticket — a single search returns 0 and the resolved branch\n' +
+    'creates a SECOND ticket in `solved` state for the same incident.\n\n' +
+    'Mitigation: 3 search attempts on the resolved branch:\n' +
+    '1. Immediate (`Find Open Ticket (Resolved)`)\n' +
+    '2. After 5s wait (`Find Open Ticket (Resolved) Retry 2`)\n' +
+    '3. After additional 10s wait (`Find Open Ticket (Resolved) Retry 3`)\n\n' +
+    'Worst-case latency: 15s before pre-create fallback fires. Webhook\n' +
+    'still responds 200 at the end of whichever path wins.\n\n' +
+    '**Pre-create fallback**: If all 3 attempts return 0 results, the\n' +
+    '`started` webhook was genuinely dropped — create the ticket directly\n' +
+    'in `solved` state with the resolution comment baked in.\n\n' +
     '**Duplication note**: The resolution-comment formatter is duplicated\n' +
     'between `Format Resolution Comment (Pre-create)` here and `Compute Downtime\n' +
-    '+ Format Comment` in the resolve sub-workflow. Both must stay in lockstep.\n' +
-    'A shared "format comment" sub-workflow would centralize this, but adds an\n' +
-    'extra hop for one extra caller — accepted as the cleanest n8n-native option.',
+    '+ Format Comment` in the resolve sub-workflow. Both must stay in lockstep.',
   [],
   { color: 5 }
 );
@@ -840,7 +1057,29 @@ export default workflow('betterstack-receiver', 'Betterstack → Zendesk Receive
         findOpenTicketResolved.to(
           resolvedTicketFound
             .onTrue(callResolveSubworkflow.to(respondResolved))
-            .onFalse(formatCommentForCreate.to(createSolvedTicket.to(respondResolved)))
+            // Retry chain: search returned 0 → wait, search again, repeat.
+            // Worst-case 15s before falling through to pre-create. Mitigates
+            // the Zendesk-search-index lag race where the started webhook
+            // creates the ticket seconds before this resolved webhook fires.
+            .onFalse(
+              waitFiveSeconds.to(
+                findOpenTicketResolved2.to(
+                  resolvedTicketFound2
+                    .onTrue(callResolveSubworkflow2.to(respondResolved))
+                    .onFalse(
+                      waitTenSeconds.to(
+                        findOpenTicketResolved3.to(
+                          resolvedTicketFound3
+                            .onTrue(callResolveSubworkflow3.to(respondResolved))
+                            .onFalse(
+                              formatCommentForCreate.to(createSolvedTicket.to(respondResolved))
+                            )
+                        )
+                      )
+                    )
+                )
+              )
+            )
         )
       )
       .onCase(

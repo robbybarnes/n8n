@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-05-10T17:49:54.133Z",
+  "updatedAt": "2026-05-10T18:06:30.500Z",
   "createdAt": "2026-05-09T23:32:01.729Z",
   "id": "hRNmqEHzL1597PVn",
-  "name": "Betterstack \u2192 Zendesk Receiver",
-  "description": "Real-time webhook receiver for Betterstack incident events. Routes to resolved/acknowledged/started branches and mirrors lifecycle into Zendesk tickets via tag-based state.",
+  "name": "Betterstack to Zendesk Receiver",
+  "description": "Webhook receiver mirroring Betterstack incidents into Zendesk tickets via tag-based state. Resolved branch retries 3x with backoff to dodge Zendesk search-index lag.",
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -14,7 +14,7 @@
       "typeVersion": 2.1,
       "position": [
         0,
-        480
+        672
       ],
       "parameters": {
         "httpMethod": "POST",
@@ -23,7 +23,7 @@
         "authentication": "headerAuth",
         "options": {}
       },
-      "webhookId": "6ad415b2-ca1b-44d1-9ae0-932ec04e07b1",
+      "webhookId": "2a897d14-e58d-42e8-8dbc-a0a53e571fbc",
       "credentials": {
         "httpHeaderAuth": {
           "id": "OtDn9FiU0q4Fd8Ro",
@@ -38,7 +38,7 @@
       "typeVersion": 3.4,
       "position": [
         224,
-        464
+        656
       ],
       "parameters": {
         "mode": "rules",
@@ -154,7 +154,7 @@
       "typeVersion": 1,
       "position": [
         448,
-        96
+        288
       ],
       "parameters": {
         "resource": "ticket",
@@ -180,7 +180,7 @@
       "typeVersion": 2.3,
       "position": [
         672,
-        96
+        288
       ],
       "parameters": {
         "conditions": {
@@ -214,7 +214,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1120,
+        2464,
         0
       ],
       "parameters": {
@@ -276,8 +276,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1344,
-        96
+        2688,
+        288
       ],
       "parameters": {
         "respondWith": "json",
@@ -288,13 +288,291 @@
       }
     },
     {
+      "id": "aaf56003-a9e5-4dc5-a415-dd1c7f2b3dfa",
+      "name": "Wait 5s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        896,
+        384
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "webhookId": "b5331683-f80d-4504-8392-abfd6da97efb"
+    },
+    {
+      "id": "6e14b58f-c091-40b8-a5cc-2ad0d00f1e96",
+      "name": "Find Open Ticket (Resolved) Retry 2",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        384
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "options": {
+          "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "8b7d8e87-2e79-4cf5-b36f-35a424cdc191",
+      "name": "Resolved: Ticket Found? Retry 2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        384
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-ticket-id-2",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      }
+    },
+    {
+      "id": "042cab9f-dd28-444b-9fed-c950a23c2c1b",
+      "name": "Call Resolve Sub-workflow Retry 2",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        192
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "FXjwcoWpPhmv76ws"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "zendesk_ticket_id": "={{ String($('Find Open Ticket (Resolved) Retry 2').item.json.id) }}",
+            "incident_id": "={{ $('Webhook').item.json.body.data.id }}",
+            "incident": "={{ $('Webhook').item.json.body.data.attributes }}"
+          },
+          "schema": [
+            {
+              "id": "zendesk_ticket_id",
+              "displayName": "zendesk_ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident",
+              "displayName": "incident",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "506d5ccf-a697-4ed5-abe8-ceba3a28396b",
+      "name": "Wait 10s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        480
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "webhookId": "e234272c-557d-48d0-9afa-4cb0d6f9f74a"
+    },
+    {
+      "id": "33a14e9f-f3cc-4430-aa6c-6b551c4ee9f3",
+      "name": "Find Open Ticket (Resolved) Retry 3",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        480
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "options": {
+          "query": "={{ \"tags:betterstack-incident-\" + $('Webhook').item.json.body.data.id + \" status<closed\" }}"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "49621da6-7f57-47de-9a9d-9beda10ccb4e",
+      "name": "Resolved: Ticket Found? Retry 3",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2016,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-ticket-id-3",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      }
+    },
+    {
+      "id": "455e7c5c-50fb-4d90-994e-8ce550f91519",
+      "name": "Call Resolve Sub-workflow Retry 3",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2464,
+        384
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "FXjwcoWpPhmv76ws"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "zendesk_ticket_id": "={{ String($('Find Open Ticket (Resolved) Retry 3').item.json.id) }}",
+            "incident_id": "={{ $('Webhook').item.json.body.data.id }}",
+            "incident": "={{ $('Webhook').item.json.body.data.attributes }}"
+          },
+          "schema": [
+            {
+              "id": "zendesk_ticket_id",
+              "displayName": "zendesk_ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident",
+              "displayName": "incident",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
       "id": "1a95af1f-0d62-4117-9d16-af0785d338db",
       "name": "Format Resolution Comment (Pre-create)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
-        192
+        2240,
+        576
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
@@ -308,8 +586,8 @@
       "type": "n8n-nodes-base.zendesk",
       "typeVersion": 1,
       "position": [
-        1120,
-        192
+        2464,
+        576
       ],
       "parameters": {
         "resource": "ticket",
@@ -332,7 +610,7 @@
       "typeVersion": 1,
       "position": [
         448,
-        480
+        672
       ],
       "parameters": {
         "resource": "ticket",
@@ -358,7 +636,7 @@
       "typeVersion": 2.3,
       "position": [
         672,
-        480
+        672
       ],
       "parameters": {
         "conditions": {
@@ -402,7 +680,7 @@
       "typeVersion": 1,
       "position": [
         896,
-        384
+        576
       ],
       "parameters": {
         "resource": "ticket",
@@ -425,7 +703,7 @@
       "typeVersion": 1.5,
       "position": [
         1120,
-        480
+        672
       ],
       "parameters": {
         "respondWith": "json",
@@ -442,7 +720,7 @@
       "typeVersion": 1,
       "position": [
         896,
-        576
+        768
       ],
       "parameters": {}
     },
@@ -453,7 +731,7 @@
       "typeVersion": 1,
       "position": [
         448,
-        912
+        1104
       ],
       "parameters": {
         "resource": "ticket",
@@ -479,7 +757,7 @@
       "typeVersion": 2.3,
       "position": [
         672,
-        912
+        1104
       ],
       "parameters": {
         "conditions": {
@@ -514,7 +792,7 @@
       "typeVersion": 1,
       "position": [
         1344,
-        720
+        912
       ],
       "parameters": {
         "resource": "ticket",
@@ -537,7 +815,7 @@
       "typeVersion": 1.5,
       "position": [
         1568,
-        912
+        1104
       ],
       "parameters": {
         "respondWith": "json",
@@ -554,7 +832,7 @@
       "typeVersion": 1,
       "position": [
         896,
-        1008
+        1200
       ],
       "parameters": {
         "resource": "ticket",
@@ -580,7 +858,7 @@
       "typeVersion": 2.3,
       "position": [
         1120,
-        1008
+        1200
       ],
       "parameters": {
         "conditions": {
@@ -615,7 +893,7 @@
       "typeVersion": 1,
       "position": [
         1344,
-        912
+        1104
       ],
       "parameters": {
         "resource": "ticket",
@@ -638,7 +916,7 @@
       "typeVersion": 1,
       "position": [
         1344,
-        1104
+        1296
       ],
       "parameters": {
         "resource": "ticket",
@@ -655,101 +933,31 @@
       }
     },
     {
-      "id": "f2bee154-a600-4caf-abfd-6ddb910ee0ee",
-      "name": "Sticky Note 78530254",
+      "id": "f60dc367-8ff9-4fc2-84a2-bb0ca22d5691",
+      "name": "Sticky Note 42e85e87",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        784,
-        1168
+        1344,
+        1360
       ],
       "parameters": {
-        "content": "## Betterstack \u2192 Zendesk Receiver\n\n**Purpose**: Real-time webhook receiver for Betterstack incident events.\nMirrors incident lifecycle into Zendesk tickets via tag-based state.\n\n**Webhook URL**: `https://twofifteen.app.n8n.cloud/webhook/betterstack-incident`\n\n**Auth**: Built-in Webhook node `headerAuth`, backed by `httpHeaderAuth`\ncredential `Betterstack Webhook Auth` (header `X-Webhook-Auth`, value\n`Bearer <token>`). Mismatch returns HTTP 403 from the Webhook node itself,\nbefore the workflow fires. n8n Cloud does not expose `$env`, so the\ncredential pattern is the only viable option here.\n\n**Companion workflows**:\n- Resolve sub-workflow `FXjwcoWpPhmv76ws` (called for resolutions)\n- Polling reconciler (5-min fallback for missed resolution webhooks)\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
+        "content": "## Betterstack to Zendesk Receiver\n\n**Purpose**: Real-time webhook receiver for Betterstack incident events.\nMirrors incident lifecycle into Zendesk tickets via tag-based state.\n\n**Webhook URL**: `https://twofifteen.app.n8n.cloud/webhook/betterstack-incident`\n\n**Auth**: Built-in Webhook node `headerAuth`, backed by `httpHeaderAuth`\ncredential `Betterstack Webhook Auth` (header `X-Webhook-Auth`, value\n`Bearer <token>`). Mismatch returns HTTP 403 from the Webhook node itself,\nbefore the workflow fires.\n\n**Companion workflows**:\n- Resolve sub-workflow `FXjwcoWpPhmv76ws` (called for resolutions)\n- Polling reconciler (5-min fallback for missed resolution webhooks)",
         "color": 4
       }
     },
     {
-      "id": "1ff0c21a-3a4d-4503-9639-287b4f38d6af",
-      "name": "Sticky Note 7eabd6f9",
+      "id": "508d5a4d-06de-4f02-a512-dad926ef8666",
+      "name": "Sticky Note dabe6b0e",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        784,
-        1168
+        1344,
+        1360
       ],
       "parameters": {
-        "content": "## Event-type Discriminator\n\nBetterstack docs only document the top-level `event` field for `comment`\nevents. For started / acknowledged / resolved / reopened, we MUST inspect\n`data.attributes` timestamps:\n\n| Condition | Branch |\n|---|---|\n| `resolved_at != null` | resolved (output 0) |\n| `acknowledged_at != null && resolved_at == null` | acknowledged (output 1) |\n| both null | started (output 2) |\n\n**Switch fallback**: `fallbackOutput: \"none\"` \u2014 if a payload matches no\nbranch (shouldn't happen given the discriminator covers all 3 states),\nthe Switch silently drops it rather than crashing.",
+        "content": "## Edge Case: Resolved Without Create + Retry Chain\n\n**Retry-with-backoff (3 attempts)**: Zendesk search is eventually\nconsistent. If `started` fires at T+0 and creates a ticket, then\n`resolved` fires at T+13s, the search index may not yet contain the\nnew ticket \u2014 a single search returns 0 and the resolved branch\ncreates a SECOND ticket in `solved` state for the same incident.\n\nMitigation: 3 search attempts on the resolved branch:\n1. Immediate (`Find Open Ticket (Resolved)`)\n2. After 5s wait (`Find Open Ticket (Resolved) Retry 2`)\n3. After additional 10s wait (`Find Open Ticket (Resolved) Retry 3`)\n\nWorst-case latency: 15s before pre-create fallback fires. Webhook\nstill responds 200 at the end of whichever path wins.",
         "color": 5
-      }
-    },
-    {
-      "id": "69193830-2f30-42f1-83e9-aa3eb62aa2d5",
-      "name": "Sticky Note bb519bed",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        784,
-        1168
-      ],
-      "parameters": {
-        "content": "## v1 Trade-off: Ack-Before-Create\n\nIf an `acknowledged` webhook arrives before `started` (out-of-order delivery),\nthe ack lookup finds no ticket and the branch no-ops \u2014 the ack comment is\nlost. The subsequent `started` webhook will still create the ticket and the\n`resolved` webhook will still resolve it; only the ack-comment annotation is\nmissing.\n\nWe accept this in v1 rather than queueing pending acks. If this becomes a\nreal operational issue, switch to a Code-node-buffered approach in v2.\n\nAck idempotency sentinel = `betterstack-acked` tag. Set in the same Zendesk\nupdate call as the ack comment so a failed comment write never poisons the\nsentinel.",
-        "color": 5
-      }
-    },
-    {
-      "id": "4e4d95e5-58f1-4164-a0f9-545f04ebd0d1",
-      "name": "Sticky Note 22a5c17a",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        784,
-        1168
-      ],
-      "parameters": {
-        "content": "## Edge Case: Resolved Without Create\n\nIf the `resolved` webhook arrives but no open ticket exists (the `started`\nwebhook was dropped), the FALSE branch creates the ticket directly in\n`solved` state with the resolution comment baked in.\n\n**Duplication note**: The resolution-comment formatter is duplicated\nbetween `Format Resolution Comment (Pre-create)` here and `Compute Downtime\n+ Format Comment` in the resolve sub-workflow. Both must stay in lockstep.\nA shared \"format comment\" sub-workflow would centralize this, but adds an\nextra hop for one extra caller \u2014 accepted as the cleanest n8n-native option.",
-        "color": 5
-      }
-    },
-    {
-      "id": "d05cab30-83c2-4476-b97e-274d56603f4a",
-      "name": "Sticky Note 028c42da",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        784,
-        1168
-      ],
-      "parameters": {
-        "content": "## Started Branch: Reopen vs Create\n\n1. **Editable ticket exists** (`status<closed`) \u2192 reopen: status=open,\n   swap `betterstack-resolved` \u2192 `betterstack-open`, append \"reopened\" comment.\n2. **No editable ticket but a closed ticket exists** \u2192 create a NEW ticket\n   tagged `reopened`, with a comment linking back to the closed original.\n   (Zendesk auto-closes solved tickets after 24h and `closed` is terminal.)\n3. **No ticket at all** \u2192 fresh create (the normal new-incident path).\n\nAll tag mutations happen in a single Zendesk update call per branch.",
-        "color": 5
-      }
-    },
-    {
-      "id": "15d1c8fe-998a-4b8e-84b2-e79d93ea2617",
-      "name": "Sticky Note a8206698",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        784,
-        1168
-      ],
-      "parameters": {
-        "content": "## Create-node Body Construction\n\n**Description vs Comment**: Zendesk's ticket-create API auto-creates the\nfirst ticket comment from the `description` parameter when no explicit\n`comment` is provided. Passing BOTH `description` and `comment` produces\na duplicate first comment.\n\nRule applied here:\n- **Fresh + Linked + Solved creates** \u2192 set `description` only. No `comment`\n  inside `additionalFieldsJson`.\n- **Updates** (ack, reopen, resolve) \u2192 set `comment` with `public: false`.\n  Updates do not have a `description` parameter.\n\n**Newline handling**: The fresh-ticket / linked-ticket descriptions are\nbuilt via raw string concatenation in expressions \u2014 `\"\\n\"` literals end\nup as actual newline characters in the final string. Zendesk's\n`description` parameter accepts literal newlines, so no JSON wrapping is\nneeded. The solved-ticket path uses `description: $json.comment` where\n`$json.comment` already contains literal newlines from the Code node.\n\n**If we ever switch to passing description inside `additionalFieldsJson`**\n(i.e. as a JSON-encoded body), the description text MUST be wrapped in\n`JSON.stringify` to escape special chars. Today's structure avoids this\nbecause `description` is a top-level node parameter, not part of the JSON\nbody.",
-        "color": 5
-      }
-    },
-    {
-      "id": "5f93e7a4-3759-4819-8df1-3141bddaa089",
-      "name": "Sticky Note 4c1d4d92",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        784,
-        1168
-      ],
-      "parameters": {
-        "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 Zendesk Category custom field set on EVERY ticket create (fresh, linked, solved-edge-case)\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field. Set on every ticket create AND required when transitioning to solved.\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1 deployment)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
-        "color": 6
       }
     }
   ],
@@ -812,7 +1020,7 @@
         ],
         [
           {
-            "node": "Format Resolution Comment (Pre-create)",
+            "node": "Wait 5s",
             "type": "main",
             "index": 0
           }
@@ -820,6 +1028,108 @@
       ]
     },
     "Call Resolve Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5s": {
+      "main": [
+        [
+          {
+            "node": "Find Open Ticket (Resolved) Retry 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Ticket (Resolved) Retry 2": {
+      "main": [
+        [
+          {
+            "node": "Resolved: Ticket Found? Retry 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolved: Ticket Found? Retry 2": {
+      "main": [
+        [
+          {
+            "node": "Call Resolve Sub-workflow Retry 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 10s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Resolve Sub-workflow Retry 2": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 (Resolved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10s": {
+      "main": [
+        [
+          {
+            "node": "Find Open Ticket (Resolved) Retry 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Ticket (Resolved) Retry 3": {
+      "main": [
+        [
+          {
+            "node": "Resolved: Ticket Found? Retry 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolved: Ticket Found? Retry 3": {
+      "main": [
+        [
+          {
+            "node": "Call Resolve Sub-workflow Retry 3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Resolution Comment (Pre-create)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Resolve Sub-workflow Retry 3": {
       "main": [
         [
           {
@@ -1005,9 +1315,9 @@
     "builderVariant": "mcp"
   },
   "pinData": null,
-  "versionId": "a0c4cc53-3e39-4020-b07c-4bc60f47a9bf",
+  "versionId": "17010a1d-093b-4f36-9300-cb866c8f1b29",
   "activeVersionId": "a0c4cc53-3e39-4020-b07c-4bc60f47a9bf",
-  "versionCounter": 22,
+  "versionCounter": 23,
   "triggerCount": 1,
   "shared": [
     {

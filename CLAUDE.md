@@ -13,6 +13,9 @@ This repository contains n8n workflow automations built with AI assistance. Work
 | `zendesk-ai-priority-classifier-webhook.json` | Zendesk AI Priority Classifier | Webhook-triggered: classifies priority with Claude Sonnet 4.5 via OpenRouter, updates priority field and adds internal note | `SpkfnVqNO0NvuIe7` | Active |
 | `zendesk-ai-priority-classifier-polling.json` | Zendesk AI Priority Classifier (Polling) | Polls every 2 min for new tickets (fallback if webhooks unavailable) | N/A | Backup |
 | `zendesk-voice-summary.json` | Zendesk Voice Call Summary | Webhook-triggered: transcribes phone call recordings via OpenRouter (Gemini 2.5 Flash), summarizes, posts as private comment | `h0VuVi8v9Y4hGoz1` | Inactive |
+| `betterstack-zendesk-receiver.json` | Betterstack → Zendesk Receiver | Real-time webhook receiver for Betterstack incidents; creates/updates Zendesk tickets, calls resolve sub-workflow | `hRNmqEHzL1597PVn` | Active |
+| `betterstack-zendesk-poller.json` | Betterstack → Zendesk Poller | 5-min polling reconciler that catches missed resolution webhooks via Betterstack API | `rlZaQdC4uMnoOY5v` | Active |
+| `betterstack-zendesk-resolve.json` | Betterstack Resolve Sub-workflow | Shared resolution logic; idempotent via `betterstack-resolved` tag | `FXjwcoWpPhmv76ws` | Active |
 
 ### Workflow File Conventions
 

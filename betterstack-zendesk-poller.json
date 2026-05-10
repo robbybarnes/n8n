@@ -1,0 +1,1141 @@
+{
+  "updatedAt": "2026-05-10T02:47:31.114Z",
+  "createdAt": "2026-05-10T02:44:32.039Z",
+  "id": "rlZaQdC4uMnoOY5v",
+  "name": "Betterstack -> Zendesk Poller",
+  "description": "Polling fallback for Betterstack incidents. Every 5 min, finds Zendesk tickets tagged betterstack-open status<solved, looks up each on Betterstack API, calls resolve sub-workflow if Resolved or strips tag on 404.",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "15e86dec-f63b-4700-84d0-cbaaef72849d",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        512
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5974e425-fd90-4caa-b34a-861e7868885e",
+      "name": "Find Open Betterstack Tickets",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        224,
+        512
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "query": "tags:betterstack-open status<solved"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "f34ff97f-4d3f-4fc5-9ad5-f2f603b3e88b",
+      "name": "Loop Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b7507b27-68b8-4525-85f4-650c70ca7aa9",
+      "name": "Extract Incident ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        192
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst out = [];\nfor (const item of items) {\n  const ticket = item.json;\n  const tag = (ticket.tags || []).find(function(t) {\n    return typeof t === 'string' && t.indexOf('betterstack-incident-') === 0;\n  });\n  if (!tag) {\n    out.push({\n      json: {\n        skip: true,\n        reason: 'no betterstack-incident-* tag on ticket',\n        ticket_id: ticket.id,\n        ticket_tags: ticket.tags || [],\n      }\n    });\n    continue;\n  }\n  const incidentId = tag.substring('betterstack-incident-'.length);\n  out.push({\n    json: {\n      skip: false,\n      incident_id: incidentId,\n      ticket_id: ticket.id,\n      ticket_tags: ticket.tags || [],\n    }\n  });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "eb0d5de4-07a1-4639-989f-99c93c5493ff",
+      "name": "Skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-skip-flag",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      }
+    },
+    {
+      "id": "ba827948-fa85-4e27-99e6-5918a4530e04",
+      "name": "Skip (Missing Tag)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        128
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "1825424b-906e-430e-8ffc-c70a2ac894c2",
+      "name": "Loop Tickets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        448,
+        512
+      ],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "id": "33814d55-9c53-4b86-8dac-ef6b16402e53",
+      "name": "Get Betterstack Incident",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        320
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ \"https://uptime.betterstack.com/api/v3/incidents/\" + $json.incident_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TX7ufsOfAbxGftFw",
+          "name": "Betterstack Uptime API"
+        }
+      },
+      "retryOnFail": true
+    },
+    {
+      "id": "29264123-4cdb-4f77-b9bd-8f2bfa094f79",
+      "name": "Status Branch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1344,
+        304
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "is-resolved",
+                    "leftValue": "={{ $json.body.data.attributes.status }}",
+                    "rightValue": "Resolved",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "resolved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "is-404",
+                    "leftValue": "={{ $json.statusCode }}",
+                    "rightValue": 404,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "404"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "still-open",
+          "allMatchingOutputs": false
+        }
+      }
+    },
+    {
+      "id": "93fa68ff-1433-4ea8-bb04-cdc9eb4513ca",
+      "name": "Call Resolve Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        416
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "FXjwcoWpPhmv76ws"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "zendesk_ticket_id": "={{ String($('Extract Incident ID').item.json.ticket_id) }}",
+            "incident_id": "={{ $('Extract Incident ID').item.json.incident_id }}",
+            "incident": "={{ $('Get Betterstack Incident').item.json.body.data.attributes }}"
+          },
+          "schema": [
+            {
+              "id": "zendesk_ticket_id",
+              "displayName": "zendesk_ticket_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident_id",
+              "displayName": "incident_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "incident",
+              "displayName": "incident",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            }
+          ],
+          "matchingColumns": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "0475997d-8136-4100-af6b-eb4aa8efedf1",
+      "name": "Strip betterstack-open Tag",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        608
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $('Extract Incident ID').item.json.ticket_id }}",
+        "jsonParameters": true,
+        "updateFieldsJson": "={{ JSON.stringify({ tags: ($('Extract Incident ID').item.json.ticket_tags || []).filter(function(t) { return t !== \"betterstack-open\"; }), comment: { body: \"Underlying Betterstack incident no longer exists; clearing automation tag.\", public: false } }) }}"
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "cf69d8b0-d170-4241-8328-8f4503be2004",
+      "name": "Still Open (No-op)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        800
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e4c0fe13-3fb2-4f96-9154-ad524c5a2a60",
+      "name": "Sticky Note c15543a5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        864
+      ],
+      "parameters": {
+        "content": "## Betterstack -> Zendesk Poller\n\n**Cadence**: every 5 minutes.\n\n**Scope query**: `tags:betterstack-open status<solved`. Returns at most\na handful of tickets in steady state.\n\n**Purpose**: Catches resolved-event webhooks that the receiver missed.\nBoth paths converge on resolve sub-workflow `FXjwcoWpPhmv76ws`, which is idempotent via the `betterstack-resolved` sentinel tag.\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
+        "color": 4
+      }
+    },
+    {
+      "id": "808d9672-8dd4-4845-a241-d8953f0883e6",
+      "name": "Sticky Note 88e01df8",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        864
+      ],
+      "parameters": {
+        "content": "## HTTP Request Resilience\n\n`Get Betterstack Incident` is configured to:\n\n- `neverError: true` + `fullResponse: true` -- the node succeeds on 4xx/5xx\n  and exposes `statusCode`, `headers`, `body` to downstream nodes.\n- `retryOnFail: true`, `maxTries: 3`,\n  `waitBetweenTries: 2000ms` -- node-level retry on\n  transport errors. Does NOT fire on 4xx/5xx because `neverError` already\n  promotes those to \"successful\" responses.\n\n**Rate limits**: Betterstack does not publish a numeric rate limit.",
+        "color": 5
+      }
+    },
+    {
+      "id": "b4a889c0-e6f8-4d85-8750-54321c45e47f",
+      "name": "Sticky Note 57626254",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        864
+      ],
+      "parameters": {
+        "content": "## 404 Handling Rationale\n\nA 404 from `GET /api/v3/incidents/<id>` means the incident was deleted on\nthe Betterstack side. We strip `betterstack-open` (preserving the\n`betterstack-incident-<id>` audit tag) and append an internal comment.",
+        "color": 5
+      }
+    },
+    {
+      "id": "638368d6-f376-4d09-a29c-e2e82c8feeeb",
+      "name": "Sticky Note 896e23f1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        864
+      ],
+      "parameters": {
+        "content": "## Idempotency\n\nEvery resolve action is gated by the `betterstack-resolved` tag inside the\nresolve sub-workflow. The 404 strip-tag path is naturally idempotent: once\n`betterstack-open` is gone, the Zendesk Search no longer returns the ticket.",
+        "color": 5
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Find Open Betterstack Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Open Betterstack Tickets": {
+      "main": [
+        [
+          {
+            "node": "Loop Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Incident ID": {
+      "main": [
+        [
+          {
+            "node": "Skip?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip?": {
+      "main": [
+        [
+          {
+            "node": "Skip (Missing Tag)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Betterstack Incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip (Missing Tag)": {
+      "main": [
+        [
+          {
+            "node": "Loop Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Tickets": {
+      "main": [
+        [
+          {
+            "node": "Loop Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Incident ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Betterstack Incident": {
+      "main": [
+        [
+          {
+            "node": "Status Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Branch": {
+      "main": [
+        [
+          {
+            "node": "Call Resolve Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Strip betterstack-open Tag",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Still Open (No-op)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Resolve Sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Loop Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strip betterstack-open Tag": {
+      "main": [
+        [
+          {
+            "node": "Loop Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Open (No-op)": {
+      "main": [
+        [
+          {
+            "node": "Loop Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "staticData": {
+    "node:Every 5 Minutes": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "pinData": null,
+  "versionId": "07169707-7411-4b1a-b532-80512a7d7490",
+  "activeVersionId": "07169707-7411-4b1a-b532-80512a7d7490",
+  "versionCounter": 7,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-05-10T02:44:32.041Z",
+      "createdAt": "2026-05-10T02:44:32.041Z",
+      "role": "workflow:owner",
+      "workflowId": "rlZaQdC4uMnoOY5v",
+      "projectId": "Clm6sSIH1kjqDh0n",
+      "project": {
+        "updatedAt": "2025-12-19T04:32:24.914Z",
+        "createdAt": "2025-12-19T04:32:20.268Z",
+        "id": "Clm6sSIH1kjqDh0n",
+        "name": "Robby Barnes <robby@215.tech>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-05-10T02:47:22.901Z",
+    "createdAt": "2026-05-10T02:47:22.901Z",
+    "versionId": "07169707-7411-4b1a-b532-80512a7d7490",
+    "workflowId": "rlZaQdC4uMnoOY5v",
+    "nodes": [
+      {
+        "id": "15e86dec-f63b-4700-84d0-cbaaef72849d",
+        "name": "Every 5 Minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.3,
+        "position": [
+          0,
+          512
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 5
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "5974e425-fd90-4caa-b34a-861e7868885e",
+        "name": "Find Open Betterstack Tickets",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          224,
+          512
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "getAll",
+          "returnAll": true,
+          "options": {
+            "query": "tags:betterstack-open status<solved"
+          }
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        },
+        "alwaysOutputData": true
+      },
+      {
+        "id": "f34ff97f-4d3f-4fc5-9ad5-f2f603b3e88b",
+        "name": "Loop Done",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          672,
+          0
+        ],
+        "parameters": {}
+      },
+      {
+        "id": "b7507b27-68b8-4525-85f4-650c70ca7aa9",
+        "name": "Extract Incident ID",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          672,
+          192
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "language": "javaScript",
+          "jsCode": "const items = $input.all();\nconst out = [];\nfor (const item of items) {\n  const ticket = item.json;\n  const tag = (ticket.tags || []).find(function(t) {\n    return typeof t === 'string' && t.indexOf('betterstack-incident-') === 0;\n  });\n  if (!tag) {\n    out.push({\n      json: {\n        skip: true,\n        reason: 'no betterstack-incident-* tag on ticket',\n        ticket_id: ticket.id,\n        ticket_tags: ticket.tags || [],\n      }\n    });\n    continue;\n  }\n  const incidentId = tag.substring('betterstack-incident-'.length);\n  out.push({\n    json: {\n      skip: false,\n      incident_id: incidentId,\n      ticket_id: ticket.id,\n      ticket_tags: ticket.tags || [],\n    }\n  });\n}\nreturn out;"
+        }
+      },
+      {
+        "id": "eb0d5de4-07a1-4639-989f-99c93c5493ff",
+        "name": "Skip?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          896,
+          192
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "version": 2,
+              "leftValue": "",
+              "caseSensitive": true,
+              "typeValidation": "loose"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "has-skip-flag",
+                "leftValue": "={{ $json.skip }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ]
+          },
+          "options": {
+            "looseTypeValidation": true
+          }
+        }
+      },
+      {
+        "id": "ba827948-fa85-4e27-99e6-5918a4530e04",
+        "name": "Skip (Missing Tag)",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          1120,
+          128
+        ],
+        "parameters": {}
+      },
+      {
+        "id": "1825424b-906e-430e-8ffc-c70a2ac894c2",
+        "name": "Loop Tickets",
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          448,
+          512
+        ],
+        "parameters": {
+          "batchSize": 1
+        }
+      },
+      {
+        "id": "33814d55-9c53-4b86-8dac-ef6b16402e53",
+        "name": "Get Betterstack Incident",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          1120,
+          320
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "={{ \"https://uptime.betterstack.com/api/v3/incidents/\" + $json.incident_id }}",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {
+            "response": {
+              "response": {
+                "fullResponse": true,
+                "neverError": true,
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "TX7ufsOfAbxGftFw",
+            "name": "Betterstack Uptime API"
+          }
+        },
+        "retryOnFail": true
+      },
+      {
+        "id": "29264123-4cdb-4f77-b9bd-8f2bfa094f79",
+        "name": "Status Branch",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3.4,
+        "position": [
+          1344,
+          304
+        ],
+        "parameters": {
+          "mode": "rules",
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "leftValue": "",
+                    "caseSensitive": true,
+                    "typeValidation": "loose"
+                  },
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "id": "is-resolved",
+                      "leftValue": "={{ $json.body.data.attributes.status }}",
+                      "rightValue": "Resolved",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ]
+                },
+                "renameOutput": true,
+                "outputKey": "resolved"
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "version": 2,
+                    "leftValue": "",
+                    "caseSensitive": true,
+                    "typeValidation": "loose"
+                  },
+                  "combinator": "and",
+                  "conditions": [
+                    {
+                      "id": "is-404",
+                      "leftValue": "={{ $json.statusCode }}",
+                      "rightValue": 404,
+                      "operator": {
+                        "type": "number",
+                        "operation": "equals"
+                      }
+                    }
+                  ]
+                },
+                "renameOutput": true,
+                "outputKey": "404"
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "extra",
+            "renameFallbackOutput": "still-open",
+            "allMatchingOutputs": false
+          }
+        }
+      },
+      {
+        "id": "93fa68ff-1433-4ea8-bb04-cdc9eb4513ca",
+        "name": "Call Resolve Sub-workflow",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1.3,
+        "position": [
+          1568,
+          416
+        ],
+        "parameters": {
+          "source": "database",
+          "workflowId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "FXjwcoWpPhmv76ws"
+          },
+          "workflowInputs": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "zendesk_ticket_id": "={{ String($('Extract Incident ID').item.json.ticket_id) }}",
+              "incident_id": "={{ $('Extract Incident ID').item.json.incident_id }}",
+              "incident": "={{ $('Get Betterstack Incident').item.json.body.data.attributes }}"
+            },
+            "schema": [
+              {
+                "id": "zendesk_ticket_id",
+                "displayName": "zendesk_ticket_id",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              },
+              {
+                "id": "incident_id",
+                "displayName": "incident_id",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "string"
+              },
+              {
+                "id": "incident",
+                "displayName": "incident",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "canBeUsedToMatch": true,
+                "type": "object"
+              }
+            ],
+            "matchingColumns": [],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": true
+          },
+          "mode": "each",
+          "options": {
+            "waitForSubWorkflow": true
+          }
+        }
+      },
+      {
+        "id": "0475997d-8136-4100-af6b-eb4aa8efedf1",
+        "name": "Strip betterstack-open Tag",
+        "type": "n8n-nodes-base.zendesk",
+        "typeVersion": 1,
+        "position": [
+          1568,
+          608
+        ],
+        "parameters": {
+          "resource": "ticket",
+          "operation": "update",
+          "id": "={{ $('Extract Incident ID').item.json.ticket_id }}",
+          "jsonParameters": true,
+          "updateFieldsJson": "={{ JSON.stringify({ tags: ($('Extract Incident ID').item.json.ticket_tags || []).filter(function(t) { return t !== \"betterstack-open\"; }), comment: { body: \"Underlying Betterstack incident no longer exists; clearing automation tag.\", public: false } }) }}"
+        },
+        "credentials": {
+          "zendeskApi": {
+            "id": "DBsMi4j5uGGvRKXP",
+            "name": "Zendesk account"
+          }
+        }
+      },
+      {
+        "id": "cf69d8b0-d170-4241-8328-8f4503be2004",
+        "name": "Still Open (No-op)",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          1568,
+          800
+        ],
+        "parameters": {}
+      },
+      {
+        "id": "e4c0fe13-3fb2-4f96-9154-ad524c5a2a60",
+        "name": "Sticky Note c15543a5",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          864
+        ],
+        "parameters": {
+          "content": "## Betterstack -> Zendesk Poller\n\n**Cadence**: every 5 minutes.\n\n**Scope query**: `tags:betterstack-open status<solved`. Returns at most\na handful of tickets in steady state.\n\n**Purpose**: Catches resolved-event webhooks that the receiver missed.\nBoth paths converge on resolve sub-workflow `FXjwcoWpPhmv76ws`, which is idempotent via the `betterstack-resolved` sentinel tag.\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
+          "color": 4
+        }
+      },
+      {
+        "id": "808d9672-8dd4-4845-a241-d8953f0883e6",
+        "name": "Sticky Note 88e01df8",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          864
+        ],
+        "parameters": {
+          "content": "## HTTP Request Resilience\n\n`Get Betterstack Incident` is configured to:\n\n- `neverError: true` + `fullResponse: true` -- the node succeeds on 4xx/5xx\n  and exposes `statusCode`, `headers`, `body` to downstream nodes.\n- `retryOnFail: true`, `maxTries: 3`,\n  `waitBetweenTries: 2000ms` -- node-level retry on\n  transport errors. Does NOT fire on 4xx/5xx because `neverError` already\n  promotes those to \"successful\" responses.\n\n**Rate limits**: Betterstack does not publish a numeric rate limit.",
+          "color": 5
+        }
+      },
+      {
+        "id": "b4a889c0-e6f8-4d85-8750-54321c45e47f",
+        "name": "Sticky Note 57626254",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          864
+        ],
+        "parameters": {
+          "content": "## 404 Handling Rationale\n\nA 404 from `GET /api/v3/incidents/<id>` means the incident was deleted on\nthe Betterstack side. We strip `betterstack-open` (preserving the\n`betterstack-incident-<id>` audit tag) and append an internal comment.",
+          "color": 5
+        }
+      },
+      {
+        "id": "638368d6-f376-4d09-a29c-e2e82c8feeeb",
+        "name": "Sticky Note 896e23f1",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          864
+        ],
+        "parameters": {
+          "content": "## Idempotency\n\nEvery resolve action is gated by the `betterstack-resolved` tag inside the\nresolve sub-workflow. The 404 strip-tag path is naturally idempotent: once\n`betterstack-open` is gone, the Zendesk Search no longer returns the ticket.",
+          "color": 5
+        }
+      }
+    ],
+    "connections": {
+      "Every 5 Minutes": {
+        "main": [
+          [
+            {
+              "node": "Find Open Betterstack Tickets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Find Open Betterstack Tickets": {
+        "main": [
+          [
+            {
+              "node": "Loop Tickets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Incident ID": {
+        "main": [
+          [
+            {
+              "node": "Skip?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Skip?": {
+        "main": [
+          [
+            {
+              "node": "Skip (Missing Tag)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Get Betterstack Incident",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Skip (Missing Tag)": {
+        "main": [
+          [
+            {
+              "node": "Loop Tickets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Loop Tickets": {
+        "main": [
+          [
+            {
+              "node": "Loop Done",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Extract Incident ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Betterstack Incident": {
+        "main": [
+          [
+            {
+              "node": "Status Branch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Status Branch": {
+        "main": [
+          [
+            {
+              "node": "Call Resolve Sub-workflow",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Strip betterstack-open Tag",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Still Open (No-op)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Call Resolve Sub-workflow": {
+        "main": [
+          [
+            {
+              "node": "Loop Tickets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Strip betterstack-open Tag": {
+        "main": [
+          [
+            {
+              "node": "Loop Tickets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Still Open (No-op)": {
+        "main": [
+          [
+            {
+              "node": "Loop Tickets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Robby Barnes",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-05-10T02:48:28.042Z",
+        "id": 54,
+        "workflowId": "rlZaQdC4uMnoOY5v",
+        "versionId": "07169707-7411-4b1a-b532-80512a7d7490",
+        "event": "activated",
+        "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
+      }
+    ]
+  }
+}

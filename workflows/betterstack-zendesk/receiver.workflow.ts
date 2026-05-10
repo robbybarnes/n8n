@@ -10,12 +10,15 @@ import {
 } from '@n8n/workflow-sdk';
 
 // ---------------------------------------------------------------------------
-// TODO placeholders — replace before activating in n8n.
-// These values are baked into node parameters at workflow-compile time, so
-// editing them requires re-deploying the workflow.
+// Routing & assignment constants — baked into node parameters at workflow-
+// compile time, so editing them requires re-deploying the workflow.
 // ---------------------------------------------------------------------------
-const GROUP_ID = '0'; // TODO: real Zendesk group ID for auto-created tickets
-const REQUESTER_EMAIL = 'TODO_REQUESTER@example.com'; // TODO: real requester
+const GROUP_ID = 360021265172; // Zendesk group "System Administration"
+const ASSIGNEE_USER_ID = 387328728671; // Zendesk user "Robby Barnes" (robby@215.tech)
+const REQUESTER_USER_ID = 26045726036621; // Zendesk user "Better Stack" (betterstack@215.tech)
+const CATEGORY_FIELD_ID = 360048770292; // Zendesk Category custom field
+const CATEGORY_VALUE = 'network'; // Category tag (display: "Network")
+const TICKET_TYPE = 'incident'; // Zendesk SYSTEM `type` field — required when status=solved
 const PRIORITY = 'high'; // confirmed default per spec
 const COMMENT_PUBLIC = true; // matches existing Zapier zap; resolution comment public flag
 const RESOLVE_SUBWORKFLOW_ID = 'FXjwcoWpPhmv76ws'; // resolve sub-workflow (Phase 1)
@@ -339,14 +342,25 @@ const formatCommentForCreate = node({
 // produce a duplicate first comment on the ticket. The first comment defaults
 // to public, matching the prior `COMMENT_PUBLIC = true` behavior. (Constant
 // retained for documentation / future re-use.)
+// `type` is a Zendesk SYSTEM field set at the top level (NOT in custom_fields).
+// Required by Zendesk when transitioning to `solved`. Category is the only
+// custom field set here.
 const createSolvedAdditionalFieldsExpression =
-  '={{ JSON.stringify({ subject: "[Betterstack] " + $(\'Webhook\').item.json.body.data.attributes.name + " is down", status: "solved", priority: ' +
+  '={{ JSON.stringify({ subject: "[Betterstack] " + $(\'Webhook\').item.json.body.data.attributes.name + " is down", status: "solved", type: ' +
+  JSON.stringify(TICKET_TYPE) +
+  ', priority: ' +
   JSON.stringify(PRIORITY) +
   ', group_id: ' +
   JSON.stringify(GROUP_ID) +
-  ', requester: { email: ' +
-  JSON.stringify(REQUESTER_EMAIL) +
-  ' }, tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-resolved", "automated"] }) }}';
+  ', assignee_id: ' +
+  JSON.stringify(ASSIGNEE_USER_ID) +
+  ', requester_id: ' +
+  JSON.stringify(REQUESTER_USER_ID) +
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-resolved", "automated"], custom_fields: [{ id: ' +
+  JSON.stringify(CATEGORY_FIELD_ID) +
+  ', value: ' +
+  JSON.stringify(CATEGORY_VALUE) +
+  ' }] }) }}';
 
 const createSolvedTicket = node({
   type: 'n8n-nodes-base.zendesk',
@@ -601,9 +615,11 @@ const createLinkedAdditionalFieldsExpression =
   JSON.stringify(PRIORITY) +
   ', group_id: ' +
   JSON.stringify(GROUP_ID) +
-  ', requester: { email: ' +
-  JSON.stringify(REQUESTER_EMAIL) +
-  ' }, tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated", "reopened"] }) }}';
+  ', assignee_id: ' +
+  JSON.stringify(ASSIGNEE_USER_ID) +
+  ', requester_id: ' +
+  JSON.stringify(REQUESTER_USER_ID) +
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated", "reopened"] }) }}';
 
 const createLinkedTicket = node({
   type: 'n8n-nodes-base.zendesk',
@@ -633,9 +649,11 @@ const createFreshAdditionalFieldsExpression =
   JSON.stringify(PRIORITY) +
   ', group_id: ' +
   JSON.stringify(GROUP_ID) +
-  ', requester: { email: ' +
-  JSON.stringify(REQUESTER_EMAIL) +
-  ' }, tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated"] }) }}';
+  ', assignee_id: ' +
+  JSON.stringify(ASSIGNEE_USER_ID) +
+  ', requester_id: ' +
+  JSON.stringify(REQUESTER_USER_ID) +
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated"] }) }}';
 
 const createFreshTicket = node({
   type: 'n8n-nodes-base.zendesk',
@@ -780,13 +798,16 @@ const createNodeBodySticky = sticky(
   { color: 5 }
 );
 
-const todoSticky = sticky(
-  '## TODOs Before Activation\n\n' +
-    'Edit constants at the top of `receiver.workflow.ts`:\n\n' +
-    '- `GROUP_ID` — Zendesk group ID for auto-created tickets (currently `"0"`)\n' +
-    '- `REQUESTER_EMAIL` — service-account email (currently `TODO_REQUESTER@example.com`)\n' +
-    '- `PRIORITY` — currently `"high"` per spec default\n' +
-    '- `COMMENT_PUBLIC` — currently `true` (matches Zapier zap)\n' +
+const configSticky = sticky(
+  '## Routing & Assignment Config (constants)\n\n' +
+    'Set at the top of `receiver.workflow.ts`:\n\n' +
+    '- `GROUP_ID = 360021265172` — Zendesk group "System Administration"\n' +
+    '- `ASSIGNEE_USER_ID = 387328728671` — Zendesk user "Robby Barnes" (robby@215.tech)\n' +
+    '- `REQUESTER_USER_ID = 26045726036621` — Zendesk user "Better Stack" (betterstack@215.tech)\n' +
+    '- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = "network"` — used on solved-create only\n' +
+    '- `TICKET_TYPE = "incident"` — Zendesk SYSTEM `type` field; required when transitioning to solved\n' +
+    '- `PRIORITY = "high"` — per spec default\n' +
+    '- `COMMENT_PUBLIC = true` — matches Zapier zap\n' +
     '- `RESOLVE_SUBWORKFLOW_ID` — `' + RESOLVE_SUBWORKFLOW_ID + '` (Phase 1 deployment)\n\n' +
     'Auth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\n' +
     'in n8n with the bearer token wired into Betterstack\'s outgoing webhook.',
@@ -839,4 +860,4 @@ export default workflow('betterstack-receiver', 'Betterstack → Zendesk Receive
   .add(resolvedEdgeSticky)
   .add(reopenSticky)
   .add(createNodeBodySticky)
-  .add(todoSticky);
+  .add(configSticky);

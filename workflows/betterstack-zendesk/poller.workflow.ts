@@ -450,6 +450,16 @@ const httpHandlingSticky = sticky(
     '  but NOT on HTTP 4xx/5xx, because `neverError` already promotes those\n' +
     '  to "successful" responses. That\'s the right trade-off here — a 404 is\n' +
     '  a deliberate signal (incident deleted), not a transient failure to retry.\n\n' +
+    '**5xx behavior — known limitation**: a sustained Betterstack outage (5xx\n' +
+    'on every poll) will silently no-op via the still-open fallback for as long\n' +
+    'as the outage lasts. The ticket retains `betterstack-open`, so polling\n' +
+    'resumes naturally once Betterstack recovers. Acceptable for current low\n' +
+    'volume; if scaling up, add a Switch branch for `statusCode >= 500` that\n' +
+    'posts to Slack via the error-notification workflow.\n\n' +
+    '**Credential type**: this node uses `genericAuthType: "httpHeaderAuth"`\n' +
+    'with credential `Betterstack Uptime API` (Authorization = Bearer <token>).\n' +
+    'Do not swap to a different auth type without re-deploying — the node\n' +
+    'config encodes the type, not just the credential reference.\n\n' +
     '**Rate limits**: Betterstack does not publish a numeric rate limit. At\n' +
     'typical N (0-5 open Betterstack-originated tickets) this workflow makes\n' +
     'one Zendesk Search + N Betterstack GETs per ' + POLL_INTERVAL_MINUTES +

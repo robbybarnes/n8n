@@ -1,8 +1,8 @@
 {
-  "updatedAt": "2026-05-10T02:47:31.114Z",
+  "updatedAt": "2026-05-10T02:55:43.445Z",
   "createdAt": "2026-05-10T02:44:32.039Z",
   "id": "rlZaQdC4uMnoOY5v",
-  "name": "Betterstack -> Zendesk Poller",
+  "name": "Betterstack \u2192 Zendesk Poller",
   "description": "Polling fallback for Betterstack incidents. Every 5 min, finds Zendesk tickets tagged betterstack-open status<solved, looks up each on Betterstack API, calls resolve sub-workflow if Resolved or strips tag on 404.",
   "active": true,
   "isArchived": false,
@@ -336,8 +336,8 @@
       "parameters": {}
     },
     {
-      "id": "e4c0fe13-3fb2-4f96-9154-ad524c5a2a60",
-      "name": "Sticky Note c15543a5",
+      "id": "988f9354-0acb-4fb6-9ecc-653ab3dc0bfb",
+      "name": "Sticky Note 68b8504a",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -345,13 +345,13 @@
         864
       ],
       "parameters": {
-        "content": "## Betterstack -> Zendesk Poller\n\n**Cadence**: every 5 minutes.\n\n**Scope query**: `tags:betterstack-open status<solved`. Returns at most\na handful of tickets in steady state.\n\n**Purpose**: Catches resolved-event webhooks that the receiver missed.\nBoth paths converge on resolve sub-workflow `FXjwcoWpPhmv76ws`, which is idempotent via the `betterstack-resolved` sentinel tag.\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
+        "content": "## Betterstack \u2192 Zendesk Poller\n\n**Cadence**: every 5 minutes.\n\n**Scope query**: `tags:betterstack-open status<solved`. Returns at most\na handful of tickets in steady state \u2014 there is nothing to scan when no\nincidents are open.\n\n**Purpose**: Catches resolved-event webhooks that the receiver missed\n(network blip, n8n restart, Betterstack delivery glitch, etc.). Both\npaths converge on the same resolve sub-workflow `FXjwcoWpPhmv76ws`, which is idempotent via the `betterstack-resolved` sentinel tag.\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
         "color": 4
       }
     },
     {
-      "id": "808d9672-8dd4-4845-a241-d8953f0883e6",
-      "name": "Sticky Note 88e01df8",
+      "id": "1ed6650f-cc45-446b-a74a-071e5983d9aa",
+      "name": "Sticky Note ac24a5c1",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -359,13 +359,13 @@
         864
       ],
       "parameters": {
-        "content": "## HTTP Request Resilience\n\n`Get Betterstack Incident` is configured to:\n\n- `neverError: true` + `fullResponse: true` -- the node succeeds on 4xx/5xx\n  and exposes `statusCode`, `headers`, `body` to downstream nodes.\n- `retryOnFail: true`, `maxTries: 3`,\n  `waitBetweenTries: 2000ms` -- node-level retry on\n  transport errors. Does NOT fire on 4xx/5xx because `neverError` already\n  promotes those to \"successful\" responses.\n\n**Rate limits**: Betterstack does not publish a numeric rate limit.",
+        "content": "## HTTP Request Resilience\n\n`Get Betterstack Incident` is configured to:\n\n- `neverError: true` + `fullResponse: true` \u2014 the node succeeds on 4xx/5xx\n  and exposes `statusCode`, `headers`, `body` to downstream nodes. The\n  Switch then routes 200+Resolved to the resolve path, 404 to the strip-\n  tag path, and everything else to the still-open no-op.\n- `retryOnFail: true`, `maxTries: 3`,\n  `waitBetweenTries: 2000ms` \u2014 n8n's native node-\n  level retry. Note: this fires on transport errors (DNS, TLS, timeout)\n  but NOT on HTTP 4xx/5xx, because `neverError` already promotes those\n  to \"successful\" responses. That's the right trade-off here \u2014 a 404 is\n  a deliberate signal (incident deleted), not a transient failure to retry.\n\n**5xx behavior \u2014 known limitation**: a sustained Betterstack outage (5xx\non every poll) will silently no-op via the still-open fallback for as long\nas the outage lasts. The ticket retains `betterstack-open`, so polling\nresumes naturally once Betterstack recovers. Acceptable for current low\nvolume; if scaling up, add a Switch branch for `statusCode >= 500` that\nposts to Slack via the error-notification workflow.\n\n**Credential type**: this node uses `genericAuthType: \"httpHeaderAuth\"`\nwith credential `Betterstack Uptime API` (Authorization = Bearer <token>).\nDo not swap to a different auth type without re-deploying \u2014 the node\nconfig encodes the type, not just the credential reference.\n\n**Rate limits**: Betterstack does not publish a numeric rate limit. At\ntypical N (0-5 open Betterstack-originated tickets) this workflow makes\none Zendesk Search + N Betterstack GETs per 5 minutes \u2014 well within any reasonable rate budget.",
         "color": 5
       }
     },
     {
-      "id": "b4a889c0-e6f8-4d85-8750-54321c45e47f",
-      "name": "Sticky Note 57626254",
+      "id": "4d32218d-a455-42f9-91ec-85276fe74529",
+      "name": "Sticky Note 1cdf102b",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -373,13 +373,13 @@
         864
       ],
       "parameters": {
-        "content": "## 404 Handling Rationale\n\nA 404 from `GET /api/v3/incidents/<id>` means the incident was deleted on\nthe Betterstack side. We strip `betterstack-open` (preserving the\n`betterstack-incident-<id>` audit tag) and append an internal comment.",
+        "content": "## 404 Handling Rationale\n\nA 404 from `GET /api/v3/incidents/<id>` means the incident was deleted on\nthe Betterstack side. The ticket on our side still claims `betterstack-open`,\nso the poller would otherwise re-poll it forever.\n\nResolution: remove only `betterstack-open` (preserve `betterstack-incident-<id>`\nso the audit trail survives) and append an internal comment explaining the\ntag clearance. The ticket stays in its current status \u2014 operators close it\nmanually if appropriate.\n\nWe do NOT call the resolve sub-workflow in this case: there is no Betterstack\n`resolved_at` to record, so the downtime calculation would be wrong.",
         "color": 5
       }
     },
     {
-      "id": "638368d6-f376-4d09-a29c-e2e82c8feeeb",
-      "name": "Sticky Note 896e23f1",
+      "id": "869b769f-2abe-4aee-980b-6e78b0bbb9c0",
+      "name": "Sticky Note ee14d9b0",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -387,7 +387,7 @@
         864
       ],
       "parameters": {
-        "content": "## Idempotency\n\nEvery resolve action is gated by the `betterstack-resolved` tag inside the\nresolve sub-workflow. The 404 strip-tag path is naturally idempotent: once\n`betterstack-open` is gone, the Zendesk Search no longer returns the ticket.",
+        "content": "## Idempotency\n\nEvery resolve action is gated by the `betterstack-resolved` tag inside the\nresolve sub-workflow. If the receiver and the poller race to resolve the\nsame ticket, whichever wins sets the sentinel and the loser no-ops on its\nnext pass.\n\nThe 404 strip-tag path is also naturally idempotent: once `betterstack-open`\nis gone, the Zendesk Search no longer returns the ticket, so the workflow\nstops touching it.",
         "color": 5
       }
     }
@@ -557,9 +557,9 @@
     "builderVariant": "mcp"
   },
   "pinData": null,
-  "versionId": "07169707-7411-4b1a-b532-80512a7d7490",
-  "activeVersionId": "07169707-7411-4b1a-b532-80512a7d7490",
-  "versionCounter": 7,
+  "versionId": "c14b6243-88db-441f-a3f3-f056a3d3a7a2",
+  "activeVersionId": "c14b6243-88db-441f-a3f3-f056a3d3a7a2",
+  "versionCounter": 11,
   "triggerCount": 1,
   "shared": [
     {
@@ -582,9 +582,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-05-10T02:47:22.901Z",
-    "createdAt": "2026-05-10T02:47:22.901Z",
-    "versionId": "07169707-7411-4b1a-b532-80512a7d7490",
+    "updatedAt": "2026-05-10T02:55:01.725Z",
+    "createdAt": "2026-05-10T02:55:01.725Z",
+    "versionId": "c14b6243-88db-441f-a3f3-f056a3d3a7a2",
     "workflowId": "rlZaQdC4uMnoOY5v",
     "nodes": [
       {
@@ -916,8 +916,8 @@
         "parameters": {}
       },
       {
-        "id": "e4c0fe13-3fb2-4f96-9154-ad524c5a2a60",
-        "name": "Sticky Note c15543a5",
+        "id": "988f9354-0acb-4fb6-9ecc-653ab3dc0bfb",
+        "name": "Sticky Note 68b8504a",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -925,13 +925,13 @@
           864
         ],
         "parameters": {
-          "content": "## Betterstack -> Zendesk Poller\n\n**Cadence**: every 5 minutes.\n\n**Scope query**: `tags:betterstack-open status<solved`. Returns at most\na handful of tickets in steady state.\n\n**Purpose**: Catches resolved-event webhooks that the receiver missed.\nBoth paths converge on resolve sub-workflow `FXjwcoWpPhmv76ws`, which is idempotent via the `betterstack-resolved` sentinel tag.\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
+          "content": "## Betterstack \u2192 Zendesk Poller\n\n**Cadence**: every 5 minutes.\n\n**Scope query**: `tags:betterstack-open status<solved`. Returns at most\na handful of tickets in steady state \u2014 there is nothing to scan when no\nincidents are open.\n\n**Purpose**: Catches resolved-event webhooks that the receiver missed\n(network blip, n8n restart, Betterstack delivery glitch, etc.). Both\npaths converge on the same resolve sub-workflow `FXjwcoWpPhmv76ws`, which is idempotent via the `betterstack-resolved` sentinel tag.\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
           "color": 4
         }
       },
       {
-        "id": "808d9672-8dd4-4845-a241-d8953f0883e6",
-        "name": "Sticky Note 88e01df8",
+        "id": "1ed6650f-cc45-446b-a74a-071e5983d9aa",
+        "name": "Sticky Note ac24a5c1",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -939,13 +939,13 @@
           864
         ],
         "parameters": {
-          "content": "## HTTP Request Resilience\n\n`Get Betterstack Incident` is configured to:\n\n- `neverError: true` + `fullResponse: true` -- the node succeeds on 4xx/5xx\n  and exposes `statusCode`, `headers`, `body` to downstream nodes.\n- `retryOnFail: true`, `maxTries: 3`,\n  `waitBetweenTries: 2000ms` -- node-level retry on\n  transport errors. Does NOT fire on 4xx/5xx because `neverError` already\n  promotes those to \"successful\" responses.\n\n**Rate limits**: Betterstack does not publish a numeric rate limit.",
+          "content": "## HTTP Request Resilience\n\n`Get Betterstack Incident` is configured to:\n\n- `neverError: true` + `fullResponse: true` \u2014 the node succeeds on 4xx/5xx\n  and exposes `statusCode`, `headers`, `body` to downstream nodes. The\n  Switch then routes 200+Resolved to the resolve path, 404 to the strip-\n  tag path, and everything else to the still-open no-op.\n- `retryOnFail: true`, `maxTries: 3`,\n  `waitBetweenTries: 2000ms` \u2014 n8n's native node-\n  level retry. Note: this fires on transport errors (DNS, TLS, timeout)\n  but NOT on HTTP 4xx/5xx, because `neverError` already promotes those\n  to \"successful\" responses. That's the right trade-off here \u2014 a 404 is\n  a deliberate signal (incident deleted), not a transient failure to retry.\n\n**5xx behavior \u2014 known limitation**: a sustained Betterstack outage (5xx\non every poll) will silently no-op via the still-open fallback for as long\nas the outage lasts. The ticket retains `betterstack-open`, so polling\nresumes naturally once Betterstack recovers. Acceptable for current low\nvolume; if scaling up, add a Switch branch for `statusCode >= 500` that\nposts to Slack via the error-notification workflow.\n\n**Credential type**: this node uses `genericAuthType: \"httpHeaderAuth\"`\nwith credential `Betterstack Uptime API` (Authorization = Bearer <token>).\nDo not swap to a different auth type without re-deploying \u2014 the node\nconfig encodes the type, not just the credential reference.\n\n**Rate limits**: Betterstack does not publish a numeric rate limit. At\ntypical N (0-5 open Betterstack-originated tickets) this workflow makes\none Zendesk Search + N Betterstack GETs per 5 minutes \u2014 well within any reasonable rate budget.",
           "color": 5
         }
       },
       {
-        "id": "b4a889c0-e6f8-4d85-8750-54321c45e47f",
-        "name": "Sticky Note 57626254",
+        "id": "4d32218d-a455-42f9-91ec-85276fe74529",
+        "name": "Sticky Note 1cdf102b",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -953,13 +953,13 @@
           864
         ],
         "parameters": {
-          "content": "## 404 Handling Rationale\n\nA 404 from `GET /api/v3/incidents/<id>` means the incident was deleted on\nthe Betterstack side. We strip `betterstack-open` (preserving the\n`betterstack-incident-<id>` audit tag) and append an internal comment.",
+          "content": "## 404 Handling Rationale\n\nA 404 from `GET /api/v3/incidents/<id>` means the incident was deleted on\nthe Betterstack side. The ticket on our side still claims `betterstack-open`,\nso the poller would otherwise re-poll it forever.\n\nResolution: remove only `betterstack-open` (preserve `betterstack-incident-<id>`\nso the audit trail survives) and append an internal comment explaining the\ntag clearance. The ticket stays in its current status \u2014 operators close it\nmanually if appropriate.\n\nWe do NOT call the resolve sub-workflow in this case: there is no Betterstack\n`resolved_at` to record, so the downtime calculation would be wrong.",
           "color": 5
         }
       },
       {
-        "id": "638368d6-f376-4d09-a29c-e2e82c8feeeb",
-        "name": "Sticky Note 896e23f1",
+        "id": "869b769f-2abe-4aee-980b-6e78b0bbb9c0",
+        "name": "Sticky Note ee14d9b0",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -967,7 +967,7 @@
           864
         ],
         "parameters": {
-          "content": "## Idempotency\n\nEvery resolve action is gated by the `betterstack-resolved` tag inside the\nresolve sub-workflow. The 404 strip-tag path is naturally idempotent: once\n`betterstack-open` is gone, the Zendesk Search no longer returns the ticket.",
+          "content": "## Idempotency\n\nEvery resolve action is gated by the `betterstack-resolved` tag inside the\nresolve sub-workflow. If the receiver and the poller race to resolve the\nsame ticket, whichever wins sets the sentinel and the loser no-ops on its\nnext pass.\n\nThe 404 strip-tag path is also naturally idempotent: once `betterstack-open`\nis gone, the Zendesk Search no longer returns the ticket, so the workflow\nstops touching it.",
           "color": 5
         }
       }
@@ -1129,11 +1129,19 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-05-10T02:48:28.042Z",
-        "id": 54,
+        "createdAt": "2026-05-10T02:55:43.602Z",
+        "id": 56,
         "workflowId": "rlZaQdC4uMnoOY5v",
-        "versionId": "07169707-7411-4b1a-b532-80512a7d7490",
+        "versionId": "c14b6243-88db-441f-a3f3-f056a3d3a7a2",
         "event": "activated",
+        "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
+      },
+      {
+        "createdAt": "2026-05-10T02:55:43.517Z",
+        "id": 55,
+        "workflowId": "rlZaQdC4uMnoOY5v",
+        "versionId": "c14b6243-88db-441f-a3f3-f056a3d3a7a2",
+        "event": "deactivated",
         "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
       }
     ]

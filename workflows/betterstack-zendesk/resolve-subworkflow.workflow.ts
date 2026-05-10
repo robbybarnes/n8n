@@ -9,14 +9,14 @@ import {
 } from '@n8n/workflow-sdk';
 
 // ---------------------------------------------------------------------------
-// TODO placeholders — replace before activating in n8n.
-// These constants are baked into the Zendesk update node's expression at
+// Resolution constants — baked into the Zendesk update node's expression at
 // workflow-compile time, so editing them requires re-deploying the workflow.
+// Type is a Zendesk SYSTEM field (not custom), so it's set as a top-level
+// `type` parameter in the update body rather than via custom_fields.
 // ---------------------------------------------------------------------------
-const CATEGORY_FIELD_ID = 0; // TODO_CATEGORY_FIELD_ID: real Zendesk custom field ID
-const CATEGORY_VALUE = 'TODO_CATEGORY_VALUE'; // TODO: real category tag value
-const TYPE_FIELD_ID = 0; // TODO_TYPE_FIELD_ID: real Zendesk custom field ID
-const TYPE_VALUE = 'TODO_TYPE_VALUE'; // TODO: real type tag value
+const CATEGORY_FIELD_ID = 360048770292;
+const CATEGORY_VALUE = 'network';
+const TICKET_TYPE = 'incident';
 const COMMENT_PUBLIC = true; // Default true (matches Zapier zap). Flip to false to make resolution comment internal.
 
 // ---------------------------------------------------------------------------
@@ -225,19 +225,18 @@ const computeDowntime = node({
 // special characters (", \, newlines) in the configured values produce valid
 // JS string literals in the resulting expression. e.g. CATEGORY_VALUE='He said "hi"'
 // becomes:  value: "He said \"hi\""
-// Field IDs are wrapped for consistency; they're integers so this just renders
-// them as bare numbers.
+// CATEGORY_FIELD_ID is wrapped for consistency; it's an integer so this just
+// renders it as a bare number. `type` is a Zendesk SYSTEM field, set at the
+// top level (NOT inside custom_fields).
 const updateFieldsJsonExpression =
-  '={{ JSON.stringify({ status: "solved", tags: $json.newTags, comment: { body: $json.comment, public: ' +
+  '={{ JSON.stringify({ status: "solved", type: ' +
+  JSON.stringify(TICKET_TYPE) +
+  ', tags: $json.newTags, comment: { body: $json.comment, public: ' +
   (COMMENT_PUBLIC ? 'true' : 'false') +
   ' }, custom_fields: [ { id: ' +
   JSON.stringify(CATEGORY_FIELD_ID) +
   ', value: ' +
   JSON.stringify(CATEGORY_VALUE) +
-  ' }, { id: ' +
-  JSON.stringify(TYPE_FIELD_ID) +
-  ', value: ' +
-  JSON.stringify(TYPE_VALUE) +
   ' } ] }) }}';
 
 const updateZendeskTicket = node({
@@ -300,15 +299,16 @@ const docSticky = sticky(
   { color: 4 }
 );
 
-const todoSticky = sticky(
-  '## TODOs before activation\n\n' +
-    'Edit constants at the top of `resolve-subworkflow.workflow.ts`:\n\n' +
-    '- `CATEGORY_FIELD_ID` — Zendesk custom field ID for category\n' +
-    '- `CATEGORY_VALUE` — value to write to that field on resolution\n' +
-    '- `TYPE_FIELD_ID` — Zendesk custom field ID for type\n' +
-    '- `TYPE_VALUE` — value to write to that field on resolution\n' +
-    '- `COMMENT_PUBLIC` — currently `true` (matches Zapier zap). Flip to `false`\n' +
-    '  if the resolution comment should be an internal note.\n\n' +
+const configSticky = sticky(
+  '## Resolution Config (constants)\n\n' +
+    'Set at the top of `resolve-subworkflow.workflow.ts`:\n\n' +
+    '- `CATEGORY_FIELD_ID = 360048770292` — Zendesk Category custom field ID\n' +
+    '- `CATEGORY_VALUE = "network"` — Category tag (display: "Network")\n' +
+    '- `TICKET_TYPE = "incident"` — Zendesk SYSTEM `type` field (NOT custom);\n' +
+    '  set at the top level of the update body. Valid: question | incident |\n' +
+    '  problem | task. Required by Zendesk when transitioning to `solved`.\n' +
+    '- `COMMENT_PUBLIC = true` — matches Zapier zap. Flip to `false` if the\n' +
+    '  resolution comment should be an internal note.\n\n' +
     'After editing, re-validate and `mcp__n8n-mcp__update_workflow` to redeploy.',
   [],
   { color: 5 }
@@ -326,4 +326,4 @@ export default workflow('betterstack-resolve', 'Betterstack Resolve Sub-workflow
       .onFalse(computeDowntime.to(updateZendeskTicket))
   )
   .add(docSticky)
-  .add(todoSticky);
+  .add(configSticky);

@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-05-10T02:33:53.039Z",
+  "updatedAt": "2026-05-10T04:10:28.985Z",
   "createdAt": "2026-05-09T23:32:01.729Z",
   "id": "hRNmqEHzL1597PVn",
   "name": "Betterstack \u2192 Zendesk Receiver",
-  "description": "Real-time receiver for Betterstack incident webhooks. Branches by timestamp inspection (started/acknowledged/resolved). Bearer token auth via X-Webhook-Auth header.",
+  "description": "Update Betterstack receiver to set type=incident and Category=network on all create paths.",
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -23,7 +23,7 @@
         "authentication": "headerAuth",
         "options": {}
       },
-      "webhookId": "b56a534f-1894-4837-b3be-265d09ea0f06",
+      "webhookId": "2fcada14-efdd-4b7d-bfe7-e69299b60b80",
       "credentials": {
         "httpHeaderAuth": {
           "id": "OtDn9FiU0q4Fd8Ro",
@@ -622,7 +622,7 @@
         "operation": "create",
         "description": "={{ \"Original ticket #\" + $json.id + \" auto-closed before this incident reopened. Continuing investigation here.\\n\\nMonitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
         "jsonParameters": true,
-        "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"] }) }}"
+        "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", type: \"incident\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"], custom_fields: [{ id: 360048770292, value: \"network\" }] }) }}"
       },
       "credentials": {
         "zendeskApi": {
@@ -645,7 +645,7 @@
         "operation": "create",
         "description": "={{ \"Monitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
         "jsonParameters": true,
-        "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"] }) }}"
+        "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", type: \"incident\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"], custom_fields: [{ id: 360048770292, value: \"network\" }] }) }}"
       },
       "credentials": {
         "zendeskApi": {
@@ -655,8 +655,8 @@
       }
     },
     {
-      "id": "8d2297e0-1219-497e-922e-87a61be1fc63",
-      "name": "Sticky Note 461f614c",
+      "id": "f04d5030-0088-4dfe-8afb-bba0ebf82a21",
+      "name": "Sticky Note 536b9c50",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -669,8 +669,8 @@
       }
     },
     {
-      "id": "4fd1a1d6-4db8-41fe-a1da-2b0d39987a66",
-      "name": "Sticky Note 4dd89030",
+      "id": "0b37f3e7-8372-4a2b-a6f7-1de981f32dc0",
+      "name": "Sticky Note b973ecc8",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -683,8 +683,8 @@
       }
     },
     {
-      "id": "4103707b-e4c7-48ac-8da8-f5f5aa4902de",
-      "name": "Sticky Note 3a06aaa4",
+      "id": "02ca7a67-4789-4011-be0d-89604dc19b06",
+      "name": "Sticky Note 964272fd",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -697,8 +697,8 @@
       }
     },
     {
-      "id": "562a0768-095d-4bd2-b45f-cc2b16a9c0e5",
-      "name": "Sticky Note a817dadc",
+      "id": "0756ffb3-702c-46f1-8653-be9592edcd53",
+      "name": "Sticky Note b7a1f342",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -711,8 +711,8 @@
       }
     },
     {
-      "id": "2aebe522-ec46-4d3f-928e-45deffd07dc7",
-      "name": "Sticky Note 1fe7c9af",
+      "id": "09b23f1d-d67b-410a-a8c8-9562acc7ada3",
+      "name": "Sticky Note 423afddd",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -725,8 +725,8 @@
       }
     },
     {
-      "id": "98c3e4f7-ba31-40a7-9359-7e843d3baff6",
-      "name": "Sticky Note c60ca6c8",
+      "id": "53ee0547-b418-446d-9d1d-213e755fbe17",
+      "name": "Sticky Note 58db4920",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -739,8 +739,8 @@
       }
     },
     {
-      "id": "e4366eef-ee8d-4e10-be91-461f21448473",
-      "name": "Sticky Note 64741792",
+      "id": "d3d8ad1a-b6a5-49c2-bc9d-c709819cd11c",
+      "name": "Sticky Note 7b57012d",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -748,7 +748,7 @@
         1168
       ],
       "parameters": {
-        "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 used on solved-create only\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field; required when transitioning to solved\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1 deployment)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
+        "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 Zendesk Category custom field set on EVERY ticket create (fresh, linked, solved-edge-case)\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field. Set on every ticket create AND required when transitioning to solved.\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
         "color": 6
       }
     }
@@ -1005,9 +1005,9 @@
     "builderVariant": "mcp"
   },
   "pinData": null,
-  "versionId": "b71b03c7-db7c-496a-b479-c5a7a88d81e7",
-  "activeVersionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
-  "versionCounter": 16,
+  "versionId": "568a6738-b8eb-4e24-bcaf-154946b17b31",
+  "activeVersionId": "b71b03c7-db7c-496a-b479-c5a7a88d81e7",
+  "versionCounter": 19,
   "triggerCount": 1,
   "shared": [
     {
@@ -1030,9 +1030,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-05-09T23:46:28.833Z",
-    "createdAt": "2026-05-09T23:46:28.833Z",
-    "versionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
+    "updatedAt": "2026-05-10T02:33:53.040Z",
+    "createdAt": "2026-05-10T02:33:53.040Z",
+    "versionId": "b71b03c7-db7c-496a-b479-c5a7a88d81e7",
     "workflowId": "hRNmqEHzL1597PVn",
     "nodes": [
       {
@@ -1051,7 +1051,7 @@
           "authentication": "headerAuth",
           "options": {}
         },
-        "webhookId": "59684cad-118e-4f97-b158-103a6cb46e5e",
+        "webhookId": "b56a534f-1894-4837-b3be-265d09ea0f06",
         "credentials": {
           "httpHeaderAuth": {
             "id": "OtDn9FiU0q4Fd8Ro",
@@ -1216,7 +1216,7 @@
               "version": 2,
               "leftValue": "",
               "caseSensitive": true,
-              "typeValidation": "loose"
+              "typeValidation": "strict"
             },
             "combinator": "and",
             "conditions": [
@@ -1327,7 +1327,7 @@
         "parameters": {
           "mode": "runOnceForAllItems",
           "language": "javaScript",
-          "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\\n');\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
+          "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\n');\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
         }
       },
       {
@@ -1344,7 +1344,7 @@
           "operation": "create",
           "description": "={{ $json.comment }}",
           "jsonParameters": true,
-          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"solved\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-resolved\", \"automated\"] }) }}"
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"solved\", type: \"incident\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-resolved\", \"automated\"], custom_fields: [{ id: 360048770292, value: \"network\" }] }) }}"
         },
         "credentials": {
           "zendeskApi": {
@@ -1650,7 +1650,7 @@
           "operation": "create",
           "description": "={{ \"Original ticket #\" + $json.id + \" auto-closed before this incident reopened. Continuing investigation here.\\n\\nMonitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
           "jsonParameters": true,
-          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"] }) }}"
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"] }) }}"
         },
         "credentials": {
           "zendeskApi": {
@@ -1673,7 +1673,7 @@
           "operation": "create",
           "description": "={{ \"Monitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
           "jsonParameters": true,
-          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: \"114094296972\", requester: { email: \"robby@215.tech\" }, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"] }) }}"
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"] }) }}"
         },
         "credentials": {
           "zendeskApi": {
@@ -1683,8 +1683,8 @@
         }
       },
       {
-        "id": "bcbe21e7-6d49-4078-b118-a0b2db5ae0a3",
-        "name": "Sticky Note 2e1b9986",
+        "id": "8d2297e0-1219-497e-922e-87a61be1fc63",
+        "name": "Sticky Note 461f614c",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1692,8 +1692,92 @@
           1168
         ],
         "parameters": {
-          "content": "## Betterstack -> Zendesk Receiver\n\n**Purpose**: Real-time webhook receiver for Betterstack incident events.\nMirrors incident lifecycle into Zendesk tickets via tag-based state.\n\n**Webhook URL**: `https://twofifteen.app.n8n.cloud/webhook/betterstack-incident`\n\n**Auth**: Built-in Webhook node `headerAuth`, backed by `httpHeaderAuth`\ncredential `Betterstack Webhook Auth` (header `X-Webhook-Auth`, value\n`Bearer <token>`). Mismatch returns HTTP 403 from the Webhook node itself.\n\n**Companion workflows**:\n- Resolve sub-workflow `FXjwcoWpPhmv76ws` (called for resolutions)\n- Polling reconciler (5-min fallback for missed resolution webhooks)",
+          "content": "## Betterstack \u2192 Zendesk Receiver\n\n**Purpose**: Real-time webhook receiver for Betterstack incident events.\nMirrors incident lifecycle into Zendesk tickets via tag-based state.\n\n**Webhook URL**: `https://twofifteen.app.n8n.cloud/webhook/betterstack-incident`\n\n**Auth**: Built-in Webhook node `headerAuth`, backed by `httpHeaderAuth`\ncredential `Betterstack Webhook Auth` (header `X-Webhook-Auth`, value\n`Bearer <token>`). Mismatch returns HTTP 403 from the Webhook node itself,\nbefore the workflow fires. n8n Cloud does not expose `$env`, so the\ncredential pattern is the only viable option here.\n\n**Companion workflows**:\n- Resolve sub-workflow `FXjwcoWpPhmv76ws` (called for resolutions)\n- Polling reconciler (5-min fallback for missed resolution webhooks)\n\n**Spec**: `docs/superpowers/specs/2026-05-09-betterstack-zendesk-incident-workflow-design.md`",
           "color": 4
+        }
+      },
+      {
+        "id": "4fd1a1d6-4db8-41fe-a1da-2b0d39987a66",
+        "name": "Sticky Note 4dd89030",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          1168
+        ],
+        "parameters": {
+          "content": "## Event-type Discriminator\n\nBetterstack docs only document the top-level `event` field for `comment`\nevents. For started / acknowledged / resolved / reopened, we MUST inspect\n`data.attributes` timestamps:\n\n| Condition | Branch |\n|---|---|\n| `resolved_at != null` | resolved (output 0) |\n| `acknowledged_at != null && resolved_at == null` | acknowledged (output 1) |\n| both null | started (output 2) |\n\n**Switch fallback**: `fallbackOutput: \"none\"` \u2014 if a payload matches no\nbranch (shouldn't happen given the discriminator covers all 3 states),\nthe Switch silently drops it rather than crashing.",
+          "color": 5
+        }
+      },
+      {
+        "id": "4103707b-e4c7-48ac-8da8-f5f5aa4902de",
+        "name": "Sticky Note 3a06aaa4",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          1168
+        ],
+        "parameters": {
+          "content": "## v1 Trade-off: Ack-Before-Create\n\nIf an `acknowledged` webhook arrives before `started` (out-of-order delivery),\nthe ack lookup finds no ticket and the branch no-ops \u2014 the ack comment is\nlost. The subsequent `started` webhook will still create the ticket and the\n`resolved` webhook will still resolve it; only the ack-comment annotation is\nmissing.\n\nWe accept this in v1 rather than queueing pending acks. If this becomes a\nreal operational issue, switch to a Code-node-buffered approach in v2.\n\nAck idempotency sentinel = `betterstack-acked` tag. Set in the same Zendesk\nupdate call as the ack comment so a failed comment write never poisons the\nsentinel.",
+          "color": 5
+        }
+      },
+      {
+        "id": "562a0768-095d-4bd2-b45f-cc2b16a9c0e5",
+        "name": "Sticky Note a817dadc",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          1168
+        ],
+        "parameters": {
+          "content": "## Edge Case: Resolved Without Create\n\nIf the `resolved` webhook arrives but no open ticket exists (the `started`\nwebhook was dropped), the FALSE branch creates the ticket directly in\n`solved` state with the resolution comment baked in.\n\n**Duplication note**: The resolution-comment formatter is duplicated\nbetween `Format Resolution Comment (Pre-create)` here and `Compute Downtime\n+ Format Comment` in the resolve sub-workflow. Both must stay in lockstep.\nA shared \"format comment\" sub-workflow would centralize this, but adds an\nextra hop for one extra caller \u2014 accepted as the cleanest n8n-native option.",
+          "color": 5
+        }
+      },
+      {
+        "id": "2aebe522-ec46-4d3f-928e-45deffd07dc7",
+        "name": "Sticky Note 1fe7c9af",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          1168
+        ],
+        "parameters": {
+          "content": "## Started Branch: Reopen vs Create\n\n1. **Editable ticket exists** (`status<closed`) \u2192 reopen: status=open,\n   swap `betterstack-resolved` \u2192 `betterstack-open`, append \"reopened\" comment.\n2. **No editable ticket but a closed ticket exists** \u2192 create a NEW ticket\n   tagged `reopened`, with a comment linking back to the closed original.\n   (Zendesk auto-closes solved tickets after 24h and `closed` is terminal.)\n3. **No ticket at all** \u2192 fresh create (the normal new-incident path).\n\nAll tag mutations happen in a single Zendesk update call per branch.",
+          "color": 5
+        }
+      },
+      {
+        "id": "98c3e4f7-ba31-40a7-9359-7e843d3baff6",
+        "name": "Sticky Note c60ca6c8",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          1168
+        ],
+        "parameters": {
+          "content": "## Create-node Body Construction\n\n**Description vs Comment**: Zendesk's ticket-create API auto-creates the\nfirst ticket comment from the `description` parameter when no explicit\n`comment` is provided. Passing BOTH `description` and `comment` produces\na duplicate first comment.\n\nRule applied here:\n- **Fresh + Linked + Solved creates** \u2192 set `description` only. No `comment`\n  inside `additionalFieldsJson`.\n- **Updates** (ack, reopen, resolve) \u2192 set `comment` with `public: false`.\n  Updates do not have a `description` parameter.\n\n**Newline handling**: The fresh-ticket / linked-ticket descriptions are\nbuilt via raw string concatenation in expressions \u2014 `\"\\n\"` literals end\nup as actual newline characters in the final string. Zendesk's\n`description` parameter accepts literal newlines, so no JSON wrapping is\nneeded. The solved-ticket path uses `description: $json.comment` where\n`$json.comment` already contains literal newlines from the Code node.\n\n**If we ever switch to passing description inside `additionalFieldsJson`**\n(i.e. as a JSON-encoded body), the description text MUST be wrapped in\n`JSON.stringify` to escape special chars. Today's structure avoids this\nbecause `description` is a top-level node parameter, not part of the JSON\nbody.",
+          "color": 5
+        }
+      },
+      {
+        "id": "e4366eef-ee8d-4e10-be91-461f21448473",
+        "name": "Sticky Note 64741792",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          784,
+          1168
+        ],
+        "parameters": {
+          "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 used on solved-create only\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field; required when transitioning to solved\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1 deployment)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
+          "color": 6
         }
       }
     ],
@@ -1945,19 +2029,11 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-05-09T23:46:29.128Z",
-        "id": 49,
+        "createdAt": "2026-05-10T02:35:04.472Z",
+        "id": 53,
         "workflowId": "hRNmqEHzL1597PVn",
-        "versionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
+        "versionId": "b71b03c7-db7c-496a-b479-c5a7a88d81e7",
         "event": "activated",
-        "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
-      },
-      {
-        "createdAt": "2026-05-09T23:46:28.999Z",
-        "id": 48,
-        "workflowId": "hRNmqEHzL1597PVn",
-        "versionId": "1f14e247-8b13-480a-adbf-39d0fede2d41",
-        "event": "deactivated",
         "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
       }
     ]

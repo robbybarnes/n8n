@@ -611,7 +611,9 @@ const createLinkedDescriptionExpression =
   '={{ "Original ticket #" + $json.id + " auto-closed before this incident reopened. Continuing investigation here.\\n\\nMonitor: " + $(\'Webhook\').item.json.body.data.attributes.name + "\\nURL: " + ($(\'Webhook\').item.json.body.data.attributes.url || "n/a") + "\\nCause: " + ($(\'Webhook\').item.json.body.data.attributes.cause || "Not specified") + "\\nStarted at: " + ($(\'Webhook\').item.json.body.data.attributes.started_at || "unknown") + ($(\'Webhook\').item.json.body.data.attributes.screenshot_url ? ("\\nScreenshot: " + $(\'Webhook\').item.json.body.data.attributes.screenshot_url) : "") }}';
 
 const createLinkedAdditionalFieldsExpression =
-  '={{ JSON.stringify({ subject: "[Betterstack] " + $(\'Webhook\').item.json.body.data.attributes.name + " is down", status: "open", priority: ' +
+  '={{ JSON.stringify({ subject: "[Betterstack] " + $(\'Webhook\').item.json.body.data.attributes.name + " is down", status: "open", type: ' +
+  JSON.stringify(TICKET_TYPE) +
+  ', priority: ' +
   JSON.stringify(PRIORITY) +
   ', group_id: ' +
   JSON.stringify(GROUP_ID) +
@@ -619,7 +621,11 @@ const createLinkedAdditionalFieldsExpression =
   JSON.stringify(ASSIGNEE_USER_ID) +
   ', requester_id: ' +
   JSON.stringify(REQUESTER_USER_ID) +
-  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated", "reopened"] }) }}';
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated", "reopened"], custom_fields: [{ id: ' +
+  JSON.stringify(CATEGORY_FIELD_ID) +
+  ', value: ' +
+  JSON.stringify(CATEGORY_VALUE) +
+  ' }] }) }}';
 
 const createLinkedTicket = node({
   type: 'n8n-nodes-base.zendesk',
@@ -645,7 +651,9 @@ const createFreshDescriptionExpression =
   '={{ "Monitor: " + $(\'Webhook\').item.json.body.data.attributes.name + "\\nURL: " + ($(\'Webhook\').item.json.body.data.attributes.url || "n/a") + "\\nCause: " + ($(\'Webhook\').item.json.body.data.attributes.cause || "Not specified") + "\\nStarted at: " + ($(\'Webhook\').item.json.body.data.attributes.started_at || "unknown") + ($(\'Webhook\').item.json.body.data.attributes.screenshot_url ? ("\\nScreenshot: " + $(\'Webhook\').item.json.body.data.attributes.screenshot_url) : "") }}';
 
 const createFreshAdditionalFieldsExpression =
-  '={{ JSON.stringify({ subject: "[Betterstack] " + $(\'Webhook\').item.json.body.data.attributes.name + " is down", status: "open", priority: ' +
+  '={{ JSON.stringify({ subject: "[Betterstack] " + $(\'Webhook\').item.json.body.data.attributes.name + " is down", status: "open", type: ' +
+  JSON.stringify(TICKET_TYPE) +
+  ', priority: ' +
   JSON.stringify(PRIORITY) +
   ', group_id: ' +
   JSON.stringify(GROUP_ID) +
@@ -653,7 +661,11 @@ const createFreshAdditionalFieldsExpression =
   JSON.stringify(ASSIGNEE_USER_ID) +
   ', requester_id: ' +
   JSON.stringify(REQUESTER_USER_ID) +
-  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated"] }) }}';
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated"], custom_fields: [{ id: ' +
+  JSON.stringify(CATEGORY_FIELD_ID) +
+  ', value: ' +
+  JSON.stringify(CATEGORY_VALUE) +
+  ' }] }) }}';
 
 const createFreshTicket = node({
   type: 'n8n-nodes-base.zendesk',
@@ -804,8 +816,8 @@ const configSticky = sticky(
     '- `GROUP_ID = 360021265172` — Zendesk group "System Administration"\n' +
     '- `ASSIGNEE_USER_ID = 387328728671` — Zendesk user "Robby Barnes" (robby@215.tech)\n' +
     '- `REQUESTER_USER_ID = 26045726036621` — Zendesk user "Better Stack" (betterstack@215.tech)\n' +
-    '- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = "network"` — used on solved-create only\n' +
-    '- `TICKET_TYPE = "incident"` — Zendesk SYSTEM `type` field; required when transitioning to solved\n' +
+    '- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = "network"` — Zendesk Category custom field set on EVERY ticket create (fresh, linked, solved-edge-case)\n' +
+    '- `TICKET_TYPE = "incident"` — Zendesk SYSTEM `type` field. Set on every ticket create AND required when transitioning to solved.\n' +
     '- `PRIORITY = "high"` — per spec default\n' +
     '- `COMMENT_PUBLIC = true` — matches Zapier zap\n' +
     '- `RESOLVE_SUBWORKFLOW_ID` — `' + RESOLVE_SUBWORKFLOW_ID + '` (Phase 1 deployment)\n\n' +

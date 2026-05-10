@@ -181,7 +181,7 @@ const lines = [
   '',
   outageLine,
 ];
-const comment = lines.join('\\n');
+const comment = lines.join(String.fromCharCode(10));
 
 const newTags = (ticket.tags || [])
   .filter((t) => t !== 'betterstack-open')

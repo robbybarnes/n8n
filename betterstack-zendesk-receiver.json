@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-05-10T04:10:28.985Z",
+  "updatedAt": "2026-05-10T17:49:54.133Z",
   "createdAt": "2026-05-09T23:32:01.729Z",
   "id": "hRNmqEHzL1597PVn",
   "name": "Betterstack \u2192 Zendesk Receiver",
-  "description": "Update Betterstack receiver to set type=incident and Category=network on all create paths.",
+  "description": "Real-time webhook receiver for Betterstack incident events. Routes to resolved/acknowledged/started branches and mirrors lifecycle into Zendesk tickets via tag-based state.",
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -23,7 +23,7 @@
         "authentication": "headerAuth",
         "options": {}
       },
-      "webhookId": "2fcada14-efdd-4b7d-bfe7-e69299b60b80",
+      "webhookId": "6ad415b2-ca1b-44d1-9ae0-932ec04e07b1",
       "credentials": {
         "httpHeaderAuth": {
           "id": "OtDn9FiU0q4Fd8Ro",
@@ -299,7 +299,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\n');\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
+        "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join(String.fromCharCode(10));\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
       }
     },
     {
@@ -655,8 +655,8 @@
       }
     },
     {
-      "id": "f04d5030-0088-4dfe-8afb-bba0ebf82a21",
-      "name": "Sticky Note 536b9c50",
+      "id": "f2bee154-a600-4caf-abfd-6ddb910ee0ee",
+      "name": "Sticky Note 78530254",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -669,8 +669,8 @@
       }
     },
     {
-      "id": "0b37f3e7-8372-4a2b-a6f7-1de981f32dc0",
-      "name": "Sticky Note b973ecc8",
+      "id": "1ff0c21a-3a4d-4503-9639-287b4f38d6af",
+      "name": "Sticky Note 7eabd6f9",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -683,8 +683,8 @@
       }
     },
     {
-      "id": "02ca7a67-4789-4011-be0d-89604dc19b06",
-      "name": "Sticky Note 964272fd",
+      "id": "69193830-2f30-42f1-83e9-aa3eb62aa2d5",
+      "name": "Sticky Note bb519bed",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -697,8 +697,8 @@
       }
     },
     {
-      "id": "0756ffb3-702c-46f1-8653-be9592edcd53",
-      "name": "Sticky Note b7a1f342",
+      "id": "4e4d95e5-58f1-4164-a0f9-545f04ebd0d1",
+      "name": "Sticky Note 22a5c17a",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -711,8 +711,8 @@
       }
     },
     {
-      "id": "09b23f1d-d67b-410a-a8c8-9562acc7ada3",
-      "name": "Sticky Note 423afddd",
+      "id": "d05cab30-83c2-4476-b97e-274d56603f4a",
+      "name": "Sticky Note 028c42da",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -725,8 +725,8 @@
       }
     },
     {
-      "id": "53ee0547-b418-446d-9d1d-213e755fbe17",
-      "name": "Sticky Note 58db4920",
+      "id": "15d1c8fe-998a-4b8e-84b2-e79d93ea2617",
+      "name": "Sticky Note a8206698",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -739,8 +739,8 @@
       }
     },
     {
-      "id": "d3d8ad1a-b6a5-49c2-bc9d-c709819cd11c",
-      "name": "Sticky Note 7b57012d",
+      "id": "5f93e7a4-3759-4819-8df1-3141bddaa089",
+      "name": "Sticky Note 4c1d4d92",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -748,7 +748,7 @@
         1168
       ],
       "parameters": {
-        "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 Zendesk Category custom field set on EVERY ticket create (fresh, linked, solved-edge-case)\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field. Set on every ticket create AND required when transitioning to solved.\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
+        "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 Zendesk Category custom field set on EVERY ticket create (fresh, linked, solved-edge-case)\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field. Set on every ticket create AND required when transitioning to solved.\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1 deployment)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
         "color": 6
       }
     }
@@ -1005,9 +1005,9 @@
     "builderVariant": "mcp"
   },
   "pinData": null,
-  "versionId": "568a6738-b8eb-4e24-bcaf-154946b17b31",
-  "activeVersionId": "b71b03c7-db7c-496a-b479-c5a7a88d81e7",
-  "versionCounter": 19,
+  "versionId": "a0c4cc53-3e39-4020-b07c-4bc60f47a9bf",
+  "activeVersionId": "a0c4cc53-3e39-4020-b07c-4bc60f47a9bf",
+  "versionCounter": 22,
   "triggerCount": 1,
   "shared": [
     {
@@ -1030,9 +1030,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-05-10T02:33:53.040Z",
-    "createdAt": "2026-05-10T02:33:53.040Z",
-    "versionId": "b71b03c7-db7c-496a-b479-c5a7a88d81e7",
+    "updatedAt": "2026-05-10T17:49:54.134Z",
+    "createdAt": "2026-05-10T17:49:54.134Z",
+    "versionId": "a0c4cc53-3e39-4020-b07c-4bc60f47a9bf",
     "workflowId": "hRNmqEHzL1597PVn",
     "nodes": [
       {
@@ -1051,7 +1051,7 @@
           "authentication": "headerAuth",
           "options": {}
         },
-        "webhookId": "b56a534f-1894-4837-b3be-265d09ea0f06",
+        "webhookId": "6ad415b2-ca1b-44d1-9ae0-932ec04e07b1",
         "credentials": {
           "httpHeaderAuth": {
             "id": "OtDn9FiU0q4Fd8Ro",
@@ -1327,7 +1327,7 @@
         "parameters": {
           "mode": "runOnceForAllItems",
           "language": "javaScript",
-          "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\n');\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
+          "jsCode": "const incident = $('Webhook').item.json.body.data.attributes;\nconst incidentId = $('Webhook').item.json.body.data.id;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join(String.fromCharCode(10));\n\nreturn [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];"
         }
       },
       {
@@ -1650,7 +1650,7 @@
           "operation": "create",
           "description": "={{ \"Original ticket #\" + $json.id + \" auto-closed before this incident reopened. Continuing investigation here.\\n\\nMonitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
           "jsonParameters": true,
-          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"] }) }}"
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", type: \"incident\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\", \"reopened\"], custom_fields: [{ id: 360048770292, value: \"network\" }] }) }}"
         },
         "credentials": {
           "zendeskApi": {
@@ -1673,7 +1673,7 @@
           "operation": "create",
           "description": "={{ \"Monitor: \" + $('Webhook').item.json.body.data.attributes.name + \"\\nURL: \" + ($('Webhook').item.json.body.data.attributes.url || \"n/a\") + \"\\nCause: \" + ($('Webhook').item.json.body.data.attributes.cause || \"Not specified\") + \"\\nStarted at: \" + ($('Webhook').item.json.body.data.attributes.started_at || \"unknown\") + ($('Webhook').item.json.body.data.attributes.screenshot_url ? (\"\\nScreenshot: \" + $('Webhook').item.json.body.data.attributes.screenshot_url) : \"\") }}",
           "jsonParameters": true,
-          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"] }) }}"
+          "additionalFieldsJson": "={{ JSON.stringify({ subject: \"[Betterstack] \" + $('Webhook').item.json.body.data.attributes.name + \" is down\", status: \"open\", type: \"incident\", priority: \"high\", group_id: 360021265172, assignee_id: 387328728671, requester_id: 26045726036621, tags: [\"betterstack-incident-\" + $('Webhook').item.json.body.data.id, \"betterstack-open\", \"automated\"], custom_fields: [{ id: 360048770292, value: \"network\" }] }) }}"
         },
         "credentials": {
           "zendeskApi": {
@@ -1683,8 +1683,8 @@
         }
       },
       {
-        "id": "8d2297e0-1219-497e-922e-87a61be1fc63",
-        "name": "Sticky Note 461f614c",
+        "id": "f2bee154-a600-4caf-abfd-6ddb910ee0ee",
+        "name": "Sticky Note 78530254",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1697,8 +1697,8 @@
         }
       },
       {
-        "id": "4fd1a1d6-4db8-41fe-a1da-2b0d39987a66",
-        "name": "Sticky Note 4dd89030",
+        "id": "1ff0c21a-3a4d-4503-9639-287b4f38d6af",
+        "name": "Sticky Note 7eabd6f9",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1711,8 +1711,8 @@
         }
       },
       {
-        "id": "4103707b-e4c7-48ac-8da8-f5f5aa4902de",
-        "name": "Sticky Note 3a06aaa4",
+        "id": "69193830-2f30-42f1-83e9-aa3eb62aa2d5",
+        "name": "Sticky Note bb519bed",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1725,8 +1725,8 @@
         }
       },
       {
-        "id": "562a0768-095d-4bd2-b45f-cc2b16a9c0e5",
-        "name": "Sticky Note a817dadc",
+        "id": "4e4d95e5-58f1-4164-a0f9-545f04ebd0d1",
+        "name": "Sticky Note 22a5c17a",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1739,8 +1739,8 @@
         }
       },
       {
-        "id": "2aebe522-ec46-4d3f-928e-45deffd07dc7",
-        "name": "Sticky Note 1fe7c9af",
+        "id": "d05cab30-83c2-4476-b97e-274d56603f4a",
+        "name": "Sticky Note 028c42da",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1753,8 +1753,8 @@
         }
       },
       {
-        "id": "98c3e4f7-ba31-40a7-9359-7e843d3baff6",
-        "name": "Sticky Note c60ca6c8",
+        "id": "15d1c8fe-998a-4b8e-84b2-e79d93ea2617",
+        "name": "Sticky Note a8206698",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1767,8 +1767,8 @@
         }
       },
       {
-        "id": "e4366eef-ee8d-4e10-be91-461f21448473",
-        "name": "Sticky Note 64741792",
+        "id": "5f93e7a4-3759-4819-8df1-3141bddaa089",
+        "name": "Sticky Note 4c1d4d92",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -1776,7 +1776,7 @@
           1168
         ],
         "parameters": {
-          "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 used on solved-create only\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field; required when transitioning to solved\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1 deployment)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
+          "content": "## Routing & Assignment Config (constants)\n\nSet at the top of `receiver.workflow.ts`:\n\n- `GROUP_ID = 360021265172` \u2014 Zendesk group \"System Administration\"\n- `ASSIGNEE_USER_ID = 387328728671` \u2014 Zendesk user \"Robby Barnes\" (robby@215.tech)\n- `REQUESTER_USER_ID = 26045726036621` \u2014 Zendesk user \"Better Stack\" (betterstack@215.tech)\n- `CATEGORY_FIELD_ID = 360048770292` / `CATEGORY_VALUE = \"network\"` \u2014 Zendesk Category custom field set on EVERY ticket create (fresh, linked, solved-edge-case)\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field. Set on every ticket create AND required when transitioning to solved.\n- `PRIORITY = \"high\"` \u2014 per spec default\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap\n- `RESOLVE_SUBWORKFLOW_ID` \u2014 `FXjwcoWpPhmv76ws` (Phase 1 deployment)\n\nAuth credential `Betterstack Webhook Auth` (`httpHeaderAuth`) must exist\nin n8n with the bearer token wired into Betterstack's outgoing webhook.",
           "color": 6
         }
       }
@@ -2029,10 +2029,10 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-05-10T02:35:04.472Z",
-        "id": 53,
+        "createdAt": "2026-05-10T17:51:05.335Z",
+        "id": 71,
         "workflowId": "hRNmqEHzL1597PVn",
-        "versionId": "b71b03c7-db7c-496a-b479-c5a7a88d81e7",
+        "versionId": "a0c4cc53-3e39-4020-b07c-4bc60f47a9bf",
         "event": "activated",
         "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
       }

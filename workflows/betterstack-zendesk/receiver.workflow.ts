@@ -211,7 +211,7 @@ const lines = [
   '',
   outageLine,
 ];
-const comment = lines.join('\\n');
+const comment = lines.join(String.fromCharCode(10));
 
 return [{ json: { comment: comment, incident_id: incidentId, incident: incident } }];`;
 

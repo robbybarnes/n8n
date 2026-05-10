@@ -1,9 +1,9 @@
 {
-  "updatedAt": "2026-05-10T02:28:17.036Z",
+  "updatedAt": "2026-05-10T17:47:19.778Z",
   "createdAt": "2026-05-09T22:58:54.298Z",
   "id": "FXjwcoWpPhmv76ws",
   "name": "Betterstack Resolve Sub-workflow",
-  "description": "Shared resolution logic for Betterstack incidents. Called by webhook receiver and polling reconciler. Idempotent via betterstack-resolved sentinel tag.",
+  "description": "Shared resolution sub-workflow: fetches Zendesk ticket, gates on betterstack-resolved tag, formats downtime comment, and updates ticket to solved with resolution comment + tags.",
   "active": true,
   "isArchived": false,
   "nodes": [
@@ -113,7 +113,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const ticket = $('Get Zendesk Ticket').item.json;\nconst incident = $('Execute Workflow Trigger').item.json.incident;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\nconst incidentId = $('Execute Workflow Trigger').item.json.incident_id;\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\\n');\n\nconst newTags = (ticket.tags || [])\n  .filter((t) => t !== 'betterstack-open')\n  .concat(['betterstack-resolved']);\n\nreturn [{ json: { comment: comment, newTags: newTags, ticket_id: ticket.id } }];"
+        "jsCode": "const ticket = $('Get Zendesk Ticket').item.json;\nconst incident = $('Execute Workflow Trigger').item.json.incident;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    // Surface unparseable inputs verbatim instead of silently emitting \"Invalid Date\".\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  // Strip the space before am/pm and lowercase it (\"10:09 PM\" -> \"10:09pm\")\n  // to match the Zapier zap output format (\"21 Oct 2024 at 10:09pm UTC\").\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n// No fallback \u2014 if incident_id is missing that's a caller bug; we want the\n// resulting \"ID: undefined\" line in the comment to make the bug visible.\nconst incidentId = $('Execute Workflow Trigger').item.json.incident_id;\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join(String.fromCharCode(10));\n\nconst newTags = (ticket.tags || [])\n  .filter((t) => t !== 'betterstack-open')\n  .concat(['betterstack-resolved']);\n\nreturn [{ json: { comment: comment, newTags: newTags, ticket_id: ticket.id } }];"
       }
     },
     {
@@ -140,8 +140,8 @@
       }
     },
     {
-      "id": "9e912cc4-f008-42d1-9fed-2caf084bedf3",
-      "name": "Sticky Note f6bde8e3",
+      "id": "dfb02a58-8975-4ce2-8ff8-acc1a65f88be",
+      "name": "Sticky Note 3e7ee60d",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -154,8 +154,8 @@
       }
     },
     {
-      "id": "d751bba5-254d-400c-9b82-581ebfa8d632",
-      "name": "Sticky Note 1c6f4233",
+      "id": "3cd827a9-e9f0-4c86-ad92-6e9ad962caa2",
+      "name": "Sticky Note 3235787d",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
@@ -231,9 +231,9 @@
     "builderVariant": "mcp"
   },
   "pinData": null,
-  "versionId": "962df535-bf8f-4837-98bd-72bb4c150dd6",
-  "activeVersionId": "9334475d-b52c-4b2d-8f59-c5fb69f7a9e5",
-  "versionCounter": 5,
+  "versionId": "647157fb-0133-45b2-abda-8a2b5fc577f2",
+  "activeVersionId": "647157fb-0133-45b2-abda-8a2b5fc577f2",
+  "versionCounter": 10,
   "triggerCount": 0,
   "shared": [
     {
@@ -256,9 +256,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-05-09T23:05:42.413Z",
-    "createdAt": "2026-05-09T23:05:42.413Z",
-    "versionId": "9334475d-b52c-4b2d-8f59-c5fb69f7a9e5",
+    "updatedAt": "2026-05-10T17:47:19.779Z",
+    "createdAt": "2026-05-10T17:47:19.779Z",
+    "versionId": "647157fb-0133-45b2-abda-8a2b5fc577f2",
     "workflowId": "FXjwcoWpPhmv76ws",
     "nodes": [
       {
@@ -367,7 +367,7 @@
         "parameters": {
           "mode": "runOnceForAllItems",
           "language": "javaScript",
-          "jsCode": "const ticket = $('Get Zendesk Ticket').item.json;\nconst incident = $('Execute Workflow Trigger').item.json.incident;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    // Surface unparseable inputs verbatim instead of silently emitting \"Invalid Date\".\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  // Strip the space before am/pm and lowercase it (\"10:09 PM\" -> \"10:09pm\")\n  // to match the Zapier zap output format (\"21 Oct 2024 at 10:09pm UTC\").\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n// No fallback \u2014 if incident_id is missing that's a caller bug; we want the\n// resulting \"ID: undefined\" line in the comment to make the bug visible.\nconst incidentId = $('Execute Workflow Trigger').item.json.incident_id;\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join('\\n');\n\nconst newTags = (ticket.tags || [])\n  .filter((t) => t !== 'betterstack-open')\n  .concat(['betterstack-resolved']);\n\nreturn [{ json: { comment: comment, newTags: newTags, ticket_id: ticket.id } }];"
+          "jsCode": "const ticket = $('Get Zendesk Ticket').item.json;\nconst incident = $('Execute Workflow Trigger').item.json.incident;\n\nconst startedAt = new Date(incident.started_at);\nconst resolvedAt = new Date(incident.resolved_at);\nconst diffMs = resolvedAt - startedAt;\n\nconst fmt = (d) => {\n  if (!(d instanceof Date) || isNaN(d.getTime())) {\n    // Surface unparseable inputs verbatim instead of silently emitting \"Invalid Date\".\n    return String(d);\n  }\n  const formatted = d.toLocaleString('en-GB', {\n    day: 'numeric', month: 'short', year: 'numeric',\n    hour: 'numeric', minute: '2-digit', hour12: true,\n    timeZone: 'UTC',\n  }).replace(',', ' at');\n  // Strip the space before am/pm and lowercase it (\"10:09 PM\" -> \"10:09pm\")\n  // to match the Zapier zap output format (\"21 Oct 2024 at 10:09pm UTC\").\n  return formatted.replace(/\\s(am|pm)/i, (_, p) => p.toLowerCase()) + ' UTC';\n};\n\nconst cause = incident.cause || 'Not specified';\n// No fallback \u2014 if incident_id is missing that's a caller bug; we want the\n// resulting \"ID: undefined\" line in the comment to make the bug visible.\nconst incidentId = $('Execute Workflow Trigger').item.json.incident_id;\n\nlet outageLine;\nif (isNaN(diffMs) || diffMs < 0) {\n  outageLine = 'Total Outage Time - Unknown';\n} else {\n  const days = Math.floor(diffMs / 86400000);\n  const hours = Math.floor((diffMs % 86400000) / 3600000);\n  const minutes = Math.floor((diffMs % 3600000) / 60000);\n  const seconds = Math.floor((diffMs % 60000) / 1000);\n  outageLine = 'Total Outage Time - ' + days + ' Days, ' + hours + ' Hours, ' + minutes + ' Minutes, ' + seconds + ' Seconds';\n}\n\nconst lines = [\n  'Status - resolved',\n  '',\n  'Title of the failing monitor: ' + incident.name,\n  'Cause of the incident: ' + cause,\n  'ID: ' + incidentId,\n  '',\n  'Start Time - ' + fmt(startedAt),\n  'Resolution Time - ' + fmt(resolvedAt),\n  '',\n  outageLine,\n];\nconst comment = lines.join(String.fromCharCode(10));\n\nconst newTags = (ticket.tags || [])\n  .filter((t) => t !== 'betterstack-open')\n  .concat(['betterstack-resolved']);\n\nreturn [{ json: { comment: comment, newTags: newTags, ticket_id: ticket.id } }];"
         }
       },
       {
@@ -384,7 +384,7 @@
           "operation": "update",
           "id": "={{ $json.ticket_id }}",
           "jsonParameters": true,
-          "updateFieldsJson": "={{ JSON.stringify({ status: \"solved\", tags: $json.newTags, comment: { body: $json.comment, public: true }, custom_fields: [ { id: 0, value: \"TODO_CATEGORY_VALUE\" }, { id: 0, value: \"TODO_TYPE_VALUE\" } ] }) }}"
+          "updateFieldsJson": "={{ JSON.stringify({ status: \"solved\", type: \"incident\", tags: $json.newTags, comment: { body: $json.comment, public: true }, custom_fields: [ { id: 360048770292, value: \"network\" } ] }) }}"
         },
         "credentials": {
           "zendeskApi": {
@@ -394,8 +394,8 @@
         }
       },
       {
-        "id": "fc01a1c3-a656-4b9e-9842-1d4b2bcf56c9",
-        "name": "Sticky Note 7aa7f816",
+        "id": "dfb02a58-8975-4ce2-8ff8-acc1a65f88be",
+        "name": "Sticky Note 3e7ee60d",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -408,8 +408,8 @@
         }
       },
       {
-        "id": "22abc97e-5a0b-4078-93bb-9d9e77ba57f0",
-        "name": "Sticky Note 0e1d70a4",
+        "id": "3cd827a9-e9f0-4c86-ad92-6e9ad962caa2",
+        "name": "Sticky Note 3235787d",
         "type": "n8n-nodes-base.stickyNote",
         "typeVersion": 1,
         "position": [
@@ -417,7 +417,7 @@
           256
         ],
         "parameters": {
-          "content": "## TODOs before activation\n\nEdit constants at the top of `resolve-subworkflow.workflow.ts`:\n\n- `CATEGORY_FIELD_ID` \u2014 Zendesk custom field ID for category\n- `CATEGORY_VALUE` \u2014 value to write to that field on resolution\n- `TYPE_FIELD_ID` \u2014 Zendesk custom field ID for type\n- `TYPE_VALUE` \u2014 value to write to that field on resolution\n- `COMMENT_PUBLIC` \u2014 currently `true` (matches Zapier zap). Flip to `false`\n  if the resolution comment should be an internal note.\n\nAfter editing, re-validate and `mcp__n8n-mcp__update_workflow` to redeploy.",
+          "content": "## Resolution Config (constants)\n\nSet at the top of `resolve-subworkflow.workflow.ts`:\n\n- `CATEGORY_FIELD_ID = 360048770292` \u2014 Zendesk Category custom field ID\n- `CATEGORY_VALUE = \"network\"` \u2014 Category tag (display: \"Network\")\n- `TICKET_TYPE = \"incident\"` \u2014 Zendesk SYSTEM `type` field (NOT custom);\n  set at the top level of the update body. Valid: question | incident |\n  problem | task. Required by Zendesk when transitioning to `solved`.\n- `COMMENT_PUBLIC = true` \u2014 matches Zapier zap. Flip to `false` if the\n  resolution comment should be an internal note.\n\nAfter editing, re-validate and `mcp__n8n-mcp__update_workflow` to redeploy.",
           "color": 5
         }
       }
@@ -481,10 +481,10 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-05-09T23:32:51.465Z",
-        "id": 40,
+        "createdAt": "2026-05-10T17:51:04.688Z",
+        "id": 69,
         "workflowId": "FXjwcoWpPhmv76ws",
-        "versionId": "9334475d-b52c-4b2d-8f59-c5fb69f7a9e5",
+        "versionId": "647157fb-0133-45b2-abda-8a2b5fc577f2",
         "event": "activated",
         "userId": "2d06cfbf-8892-46dd-a5de-3f5afdd42a5f"
       }

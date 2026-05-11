@@ -564,7 +564,7 @@ const createSolvedAdditionalFieldsExpression =
   JSON.stringify(ASSIGNEE_USER_ID) +
   ', requester_id: ' +
   JSON.stringify(REQUESTER_USER_ID) +
-  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-resolved", "automated"], custom_fields: [{ id: ' +
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-resolved", "automated", "bypass-satisfaction-rating", "no-email-reply"], custom_fields: [{ id: ' +
   JSON.stringify(CATEGORY_FIELD_ID) +
   ', value: ' +
   JSON.stringify(CATEGORY_VALUE) +
@@ -829,7 +829,7 @@ const createLinkedAdditionalFieldsExpression =
   JSON.stringify(ASSIGNEE_USER_ID) +
   ', requester_id: ' +
   JSON.stringify(REQUESTER_USER_ID) +
-  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated", "reopened"], custom_fields: [{ id: ' +
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated", "reopened", "bypass-satisfaction-rating", "no-email-reply"], custom_fields: [{ id: ' +
   JSON.stringify(CATEGORY_FIELD_ID) +
   ', value: ' +
   JSON.stringify(CATEGORY_VALUE) +
@@ -869,7 +869,7 @@ const createFreshAdditionalFieldsExpression =
   JSON.stringify(ASSIGNEE_USER_ID) +
   ', requester_id: ' +
   JSON.stringify(REQUESTER_USER_ID) +
-  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated"], custom_fields: [{ id: ' +
+  ', tags: ["betterstack-incident-" + $(\'Webhook\').item.json.body.data.id, "betterstack-open", "automated", "bypass-satisfaction-rating", "no-email-reply"], custom_fields: [{ id: ' +
   JSON.stringify(CATEGORY_FIELD_ID) +
   ', value: ' +
   JSON.stringify(CATEGORY_VALUE) +

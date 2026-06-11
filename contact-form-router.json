@@ -1,0 +1,1095 @@
+{
+  "name": "Contact Form Router",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contact-form",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Contact Form Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 304],
+      "webhookId": "contact-form-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "TP4n8kMCFLmy3VaO",
+          "name": "Contact Form Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 512]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-name",
+              "name": "name",
+              "value": "={{ (($json.body || {}).name || $json.name || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-email",
+              "name": "email",
+              "value": "={{ (($json.body || {}).email || $json.email || '').toLowerCase().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-company",
+              "name": "company",
+              "value": "={{ (($json.body || {}).company || $json.company || '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-phone",
+              "name": "phone",
+              "value": "={{ (() => { const raw = ($json.body || {}).phone || $json.phone || ''; const digits = raw.replace(/[^0-9]/g, ''); if (raw.startsWith('+') && digits.length >= 10) return '+' + digits; if (digits.length === 10) return '+1' + digits; if (digits.length === 11 && digits.startsWith('1')) return '+' + digits; return ''; })() }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-message",
+              "name": "message",
+              "value": "={{ ($json.body || {}).message || $json.message || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-domain",
+              "name": "emailDomain",
+              "value": "={{ (($json.body || {}).email || $json.email || '').toLowerCase().trim().split('@')[1] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-first",
+              "name": "firstName",
+              "value": "={{ (($json.body || {}).name || $json.name || '').trim().split(' ')[0] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-last",
+              "name": "lastName",
+              "value": "={{ (($json.body || {}).name || $json.name || '').trim().split(' ').slice(1).join(' ') || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-valid-email",
+              "name": "isValidEmail",
+              "value": "={{ /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test((($json.body || {}).email || $json.email || '').toLowerCase().trim()) }}",
+              "type": "boolean"
+            },
+            {
+              "id": "assign-free-email",
+              "name": "isFreeEmail",
+              "value": "={{ ['gmail.com','googlemail.com','yahoo.com','ymail.com','rocketmail.com','hotmail.com','outlook.com','live.com','msn.com','icloud.com','me.com','mac.com','aol.com','protonmail.com','proton.me','pm.me','gmx.com','gmx.net','zoho.com','mail.com','fastmail.com','hey.com','duck.com','comcast.net','att.net','verizon.net','sbcglobal.net','cox.net','charter.net','earthlink.net','q.com','centurylink.net'].includes((($json.body || {}).email || $json.email || '').toLowerCase().trim().split('@')[1] || '') }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-data",
+      "name": "Prepare Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [224, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid-email",
+              "leftValue": "={{ $json.isValidEmail }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid-email",
+      "name": "Valid Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [448, 400]
+    },
+    {
+      "parameters": {},
+      "id": "discard-invalid",
+      "name": "Discard (Invalid Email)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [672, 608]
+    },
+    {
+      "parameters": {
+        "text": "=Name: {{ $json.name }}\nEmail: {{ $json.email }}\nCompany: {{ $json.company }}\nPhone: {{ $json.phone }}\nMessage:\n{{ $json.message }}",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "spam",
+              "description": "MUST be exactly the lowercase string 'true' if the submission is spam, or 'false' if it is legitimate.",
+              "required": true
+            },
+            {
+              "name": "reason",
+              "description": "A brief one-sentence explanation of why the submission was classified as spam or legitimate.",
+              "required": true
+            }
+          ]
+        },
+        "options": {
+          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists, attendee lists, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
+        }
+      },
+      "id": "classify-spam",
+      "name": "Classify Spam",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [672, 304],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-haiku-4.5",
+        "options": {}
+      },
+      "id": "openrouter-spam-model",
+      "name": "OpenRouter Spam Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [672, 480],
+      "credentials": {
+        "openRouterApi": {
+          "id": "9Cpj8UNSpHEq0gYe",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fail open: if the classifier failed or returned garbage, treat as NOT spam\n// so a legitimate lead is never silently dropped.\nconst item = $input.first().json;\nlet spam = false;\nlet reason = 'classifier unavailable - failed open';\ntry {\n  const out = item.output || {};\n  spam = out.spam === true || String(out.spam).toLowerCase().trim() === 'true';\n  if (out.reason !== undefined) reason = String(out.reason);\n} catch (e) { /* fail open */ }\nreturn [{ json: { spam, reason } }];"
+      },
+      "id": "parse-spam-verdict",
+      "name": "Parse Spam Verdict",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [896, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-is-spam",
+              "leftValue": "={{ $json.spam }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-is-spam",
+      "name": "Is Spam?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1120, 304]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "name", "value": "sales" },
+        "text": "=:wastebasket: *Contact form submission filtered as spam*\n\n*From:* {{ $('Prepare Data').item.json.name }} ({{ $('Prepare Data').item.json.email }})\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Reason:* {{ $json.reason }}\n\n_No ticket or CRM record was created. If this looks like a real lead, check the execution history._",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "image",
+              "icon_url": "https://static.215.tech/images/robby-clawd.png"
+            }
+          },
+          "mrkdwn": true
+        }
+      },
+      "id": "slack-spam-filtered",
+      "name": "Slack: Spam Filtered",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [1344, 112],
+      "webhookId": "spam-filtered-notify",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://215.zendesk.com/api/v2/organizations.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [{ "name": "per_page", "value": "100" }]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.body.next_page }}",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.next_page }}",
+              "limitPagesFetched": true,
+              "maxRequests": 10
+            }
+          }
+        }
+      },
+      "id": "fetch-zd-orgs",
+      "name": "Fetch Zendesk Orgs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1344, 432],
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Zendesk search does NOT support querying organizations by domain\n// (verified empirically: 'type:organization domain:...' always returns 0),\n// so we list all orgs (paginated) and match domain_names client-side.\nconst domain = ($('Prepare Data').first().json.emailDomain || '').toLowerCase();\nconst orgs = $input.all().flatMap(i => (i.json.organizations || []));\nconst match = domain ? orgs.find(o => (o.domain_names || []).some(d => d.toLowerCase() === domain)) : null;\nreturn [{ json: { matched: !!match, orgId: match ? match.id : null, orgName: match ? match.name : '', orgsScanned: orgs.length } }];"
+      },
+      "id": "match-org-domain",
+      "name": "Match Org by Domain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1568, 432]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-org-matched",
+              "leftValue": "={{ $json.matched }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-org-found",
+      "name": "Org Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1792, 432]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://215.zendesk.com/api/v2/tickets.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ticket: { subject: 'Contact Form: ' + $('Prepare Data').item.json.name + ' - ' + $('Prepare Data').item.json.company, comment: { body: $('Prepare Data').item.json.message + '\\n\\n---\\nName: ' + $('Prepare Data').item.json.name + '\\nEmail: ' + $('Prepare Data').item.json.email + '\\nCompany: ' + $('Prepare Data').item.json.company + '\\nPhone: ' + $('Prepare Data').item.json.phone + '\\nSource: Contact Form' }, requester: { name: $('Prepare Data').item.json.name, email: $('Prepare Data').item.json.email }, organization_id: $('Match Org by Domain').item.json.orgId, tags: ['contact-form'] } }) }}",
+        "options": {}
+      },
+      "id": "create-ticket-org",
+      "name": "Create Ticket (Org Match)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2016, 240],
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "name", "value": "sales" },
+        "text": "=:ticket: *Contact Form from Existing Customer* ({{ $('Match Org by Domain').item.json.orgName }})\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n<https://215.zendesk.com/agent/tickets/{{ $json.ticket.id }}|Zendesk Ticket #{{ $json.ticket.id }}>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "image",
+              "icon_url": "https://static.215.tech/images/robby-clawd.png"
+            }
+          },
+          "mrkdwn": true
+        }
+      },
+      "id": "slack-customer-org",
+      "name": "Slack: Customer Ticket (Org)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [2240, 240],
+      "webhookId": "customer-org-notify",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://215.zendesk.com/api/v2/users/search.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ 'email:' + $('Prepare Data').item.json.email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "search-zd-user",
+      "name": "Search Zendesk User by Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2016, 624],
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-user-count",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-user-found",
+      "name": "User Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2240, 624]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://215.zendesk.com/api/v2/tickets.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ticket: { subject: 'Contact Form: ' + $('Prepare Data').item.json.name + ' - ' + $('Prepare Data').item.json.company, comment: { body: $('Prepare Data').item.json.message + '\\n\\n---\\nName: ' + $('Prepare Data').item.json.name + '\\nEmail: ' + $('Prepare Data').item.json.email + '\\nCompany: ' + $('Prepare Data').item.json.company + '\\nPhone: ' + $('Prepare Data').item.json.phone + '\\nSource: Contact Form' }, requester: { name: $('Prepare Data').item.json.name, email: $('Prepare Data').item.json.email }, tags: ['contact-form'] } }) }}",
+        "options": {}
+      },
+      "id": "create-ticket-user",
+      "name": "Create Ticket (User Match)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2464, 432],
+      "credentials": {
+        "zendeskApi": {
+          "id": "DBsMi4j5uGGvRKXP",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "name", "value": "sales" },
+        "text": "=:ticket: *Contact Form from Known Zendesk User*\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n<https://215.zendesk.com/agent/tickets/{{ $json.ticket.id }}|Zendesk Ticket #{{ $json.ticket.id }}>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "image",
+              "icon_url": "https://static.215.tech/images/robby-clawd.png"
+            }
+          },
+          "mrkdwn": true
+        }
+      },
+      "id": "slack-customer-user",
+      "name": "Slack: Customer Ticket (User)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [2688, 432],
+      "webhookId": "customer-user-notify",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/objects/people/records/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"filter\": {\"email_addresses\": \"{{ $('Prepare Data').item.json.email }}\"}, \"limit\": 1}",
+        "options": {}
+      },
+      "id": "search-attio-person",
+      "name": "Search Attio Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2464, 816],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-attio-person",
+              "leftValue": "={{ ($json.data || [])[0] ? ($json.data || [])[0].id.record_id : '' }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-person-attio",
+      "name": "Person in Attio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2688, 816]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.attio.com/v2/objects/people/records",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [{ "name": "matching_attribute", "value": "email_addresses" }]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { values: Object.assign({ email_addresses: [$('Prepare Data').item.json.email] }, $('Prepare Data').item.json.name ? { name: [{ first_name: $('Prepare Data').item.json.firstName, last_name: $('Prepare Data').item.json.lastName, full_name: $('Prepare Data').item.json.name }] } : {}, $('Prepare Data').item.json.phone ? { phone_numbers: [$('Prepare Data').item.json.phone] } : {}) } }) }}",
+        "options": {}
+      },
+      "id": "upsert-attio-person",
+      "name": "Upsert Attio Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2912, 624],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/notes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { parent_object: 'people', parent_record_id: $json.data.id.record_id, title: 'Contact Form Submission - ' + $now.toFormat('yyyy-MM-dd'), content: $('Prepare Data').item.json.message + '\\n\\n---\\nName: ' + $('Prepare Data').item.json.name + '\\nEmail: ' + $('Prepare Data').item.json.email + '\\nCompany: ' + $('Prepare Data').item.json.company + '\\nPhone: ' + $('Prepare Data').item.json.phone, format: 'plaintext' } }) }}",
+        "options": {}
+      },
+      "id": "add-note-existing",
+      "name": "Add Note (Existing Contact)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3136, 624],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "name", "value": "sales" },
+        "text": "=:incoming_envelope: *Existing Contact - Contact Form Submission*\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n_This person is already in Attio. Note added to their record._",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "image",
+              "icon_url": "https://static.215.tech/images/robby-clawd.png"
+            }
+          },
+          "mrkdwn": true
+        }
+      },
+      "id": "slack-existing-contact",
+      "name": "Slack: Existing Attio Contact",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [3360, 624],
+      "webhookId": "1d631d65-514c-4d88-8cf9-3f89ccdb7b07",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-business-domain",
+              "leftValue": "={{ $('Prepare Data').item.json.isFreeEmail }}",
+              "rightValue": false,
+              "operator": { "type": "boolean", "operation": "false", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-business-domain",
+      "name": "Has Business Domain?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2912, 1008]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/objects/companies/records/query",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"filter\": {\"domains\": \"{{ $('Prepare Data').item.json.emailDomain }}\"}, \"limit\": 1}",
+        "options": {}
+      },
+      "id": "search-attio-company",
+      "name": "Search Attio Company",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3136, 1008],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-company",
+              "leftValue": "={{ ($json.data || [])[0] ? ($json.data || [])[0].id.record_id : '' }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-company-exists",
+      "name": "Company Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [3360, 1008]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "co-id",
+              "name": "companyRecordId",
+              "value": "={{ $json.data[0].id.record_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-existing-company-id",
+      "name": "Get Existing Company ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3584, 880]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/objects/companies/records",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { values: { name: [{ value: $('Prepare Data').item.json.company || $('Prepare Data').item.json.emailDomain }], domains: [{ domain: $('Prepare Data').item.json.emailDomain }] } } }) }}",
+        "options": {}
+      },
+      "id": "create-company",
+      "name": "Create Company",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3584, 1136],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/lists/af9df9d7-6e6d-4717-864b-f2720e4dd4a7/entries",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { parent_record_id: $json.data.id.record_id, parent_object: 'companies', entry_values: {} } }) }}",
+        "options": {}
+      },
+      "id": "add-company-to-list",
+      "name": "Add Company to List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3808, 1136],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "new-co-id",
+              "name": "companyRecordId",
+              "value": "={{ $('Create Company').item.json.data.id.record_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-new-company-id",
+      "name": "Get New Company ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [4032, 1136]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/objects/people/records",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { values: Object.assign({ email_addresses: [$('Prepare Data').item.json.email] }, $('Prepare Data').item.json.name ? { name: [{ first_name: $('Prepare Data').item.json.firstName, last_name: $('Prepare Data').item.json.lastName, full_name: $('Prepare Data').item.json.name }] } : {}, $('Prepare Data').item.json.phone ? { phone_numbers: [$('Prepare Data').item.json.phone] } : {}, $json.companyRecordId ? { company: [{ target_object: 'companies', target_record_id: $json.companyRecordId }] } : {}) } }) }}",
+        "options": {}
+      },
+      "id": "create-person",
+      "name": "Create Person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4256, 1008],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/lists/6c155ff8-3d7b-408a-856a-acae1387f3c3/entries",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { parent_record_id: $json.data.id.record_id, parent_object: 'people', entry_values: {} } }) }}",
+        "options": {}
+      },
+      "id": "add-person-to-list",
+      "name": "Add Person to List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4480, 1008],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.attio.com/v2/notes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: { parent_object: 'people', parent_record_id: $('Create Person').item.json.data.id.record_id, title: 'Contact Form Submission - ' + $now.toFormat('yyyy-MM-dd'), content: $('Prepare Data').item.json.message + '\\n\\n---\\nName: ' + $('Prepare Data').item.json.name + '\\nEmail: ' + $('Prepare Data').item.json.email + '\\nCompany: ' + $('Prepare Data').item.json.company + '\\nPhone: ' + $('Prepare Data').item.json.phone, format: 'plaintext' } }) }}",
+        "options": {}
+      },
+      "id": "add-note-new-lead",
+      "name": "Add Note (New Lead)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4704, 1008],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "Jzr3nzWWJ7MKia7t",
+          "name": "Attio Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "name", "value": "sales" },
+        "text": "=:sparkles: *New Lead from Contact Form!*\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n_Added to Attio as a new lead._",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "image",
+              "icon_url": "https://static.215.tech/images/robby-clawd.png"
+            }
+          },
+          "mrkdwn": true
+        }
+      },
+      "id": "slack-new-lead",
+      "name": "Slack: New Lead",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [4928, 1008],
+      "webhookId": "907b082b-acb8-40d8-8615-296ea8ddd0dd",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Contact Form Router\n\n**Webhook**: POST /webhook/contact-form (requires `X-Webhook-Secret` header — sent by the www-215-tech Cloudflare Worker)\n\nPipeline:\n1. **Validate** — drop submissions without a parseable email\n2. **Spam filter** — Claude Haiku via OpenRouter classifies; spam gets a :wastebasket: Slack note only (fails open if classifier is down)\n3. **Zendesk Org Match** — email domain matched against org `domain_names` (client-side; Zendesk search can't query domains) → ticket linked to org\n4. **Zendesk User Match** — known user → ticket\n5. **Existing Attio Contact** — upsert person, add note, notify #sales\n6. **New Lead** — find/create company (business domains only), create person *linked to company*, add both to lead lists, note, notify #sales\n\nErrors go to the **Workflow Error Handler** (Slack DM to Robby).",
+        "height": 460,
+        "width": 360,
+        "color": 7
+      },
+      "id": "sticky-overview",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-80, -64]
+    },
+    {
+      "parameters": {
+        "content": "## Validation + Spam Filter\n\nInvalid email → discarded. Then Claude Haiku (OpenRouter) classifies spam vs. legit. Spam → compact #sales note, no ticket/CRM. Classifier errors fail OPEN (treated as legit) so leads are never lost.",
+        "height": 140,
+        "width": 620,
+        "color": 3
+      },
+      "id": "sticky-spam",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [592, 96]
+    },
+    {
+      "parameters": {
+        "content": "## Zendesk Customer Check\n\nLists all orgs (paginated) and matches `domain_names` client-side — Zendesk search does **not** support `domain:` for organizations (verified). Org match → org-linked ticket. Else known user by `email:` search → plain ticket. Both notify #sales.",
+        "height": 150,
+        "width": 700,
+        "color": 4
+      },
+      "id": "sticky-zendesk",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1312, 580]
+    },
+    {
+      "parameters": {
+        "content": "## Attio CRM Lookup\n\nExisting person → upsert (PUT with `matching_attribute` as a **query param**) + note + #sales. Name/phone only overwrite when the form provided them.",
+        "height": 130,
+        "width": 620,
+        "color": 5
+      },
+      "id": "sticky-attio-person",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2416, 1180]
+    },
+    {
+      "parameters": {
+        "content": "## New Lead Creation\n\nFree-email domains (gmail, etc.) skip the company step entirely — prevents a poisoned `gmail.com` company. Business domains: find/create company (+ list, `entry_values` required), then person is created **with an explicit `company` record-reference**, added to the people lead list, note added, #sales notified.",
+        "height": 170,
+        "width": 760,
+        "color": 6
+      },
+      "id": "sticky-new-lead",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3504, 700]
+    }
+  ],
+  "connections": {
+    "Contact Form Webhook": {
+      "main": [[{ "node": "Prepare Data", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger": {
+      "main": [[{ "node": "Prepare Data", "type": "main", "index": 0 }]]
+    },
+    "Prepare Data": {
+      "main": [[{ "node": "Valid Email?", "type": "main", "index": 0 }]]
+    },
+    "Valid Email?": {
+      "main": [
+        [{ "node": "Classify Spam", "type": "main", "index": 0 }],
+        [{ "node": "Discard (Invalid Email)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Classify Spam": {
+      "main": [[{ "node": "Parse Spam Verdict", "type": "main", "index": 0 }]]
+    },
+    "OpenRouter Spam Model": {
+      "ai_languageModel": [[{ "node": "Classify Spam", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Parse Spam Verdict": {
+      "main": [[{ "node": "Is Spam?", "type": "main", "index": 0 }]]
+    },
+    "Is Spam?": {
+      "main": [
+        [{ "node": "Slack: Spam Filtered", "type": "main", "index": 0 }],
+        [{ "node": "Fetch Zendesk Orgs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Zendesk Orgs": {
+      "main": [[{ "node": "Match Org by Domain", "type": "main", "index": 0 }]]
+    },
+    "Match Org by Domain": {
+      "main": [[{ "node": "Org Found?", "type": "main", "index": 0 }]]
+    },
+    "Org Found?": {
+      "main": [
+        [{ "node": "Create Ticket (Org Match)", "type": "main", "index": 0 }],
+        [{ "node": "Search Zendesk User by Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Ticket (Org Match)": {
+      "main": [[{ "node": "Slack: Customer Ticket (Org)", "type": "main", "index": 0 }]]
+    },
+    "Search Zendesk User by Email": {
+      "main": [[{ "node": "User Found?", "type": "main", "index": 0 }]]
+    },
+    "User Found?": {
+      "main": [
+        [{ "node": "Create Ticket (User Match)", "type": "main", "index": 0 }],
+        [{ "node": "Search Attio Person", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Ticket (User Match)": {
+      "main": [[{ "node": "Slack: Customer Ticket (User)", "type": "main", "index": 0 }]]
+    },
+    "Search Attio Person": {
+      "main": [[{ "node": "Person in Attio?", "type": "main", "index": 0 }]]
+    },
+    "Person in Attio?": {
+      "main": [
+        [{ "node": "Upsert Attio Person", "type": "main", "index": 0 }],
+        [{ "node": "Has Business Domain?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upsert Attio Person": {
+      "main": [[{ "node": "Add Note (Existing Contact)", "type": "main", "index": 0 }]]
+    },
+    "Add Note (Existing Contact)": {
+      "main": [[{ "node": "Slack: Existing Attio Contact", "type": "main", "index": 0 }]]
+    },
+    "Has Business Domain?": {
+      "main": [
+        [{ "node": "Search Attio Company", "type": "main", "index": 0 }],
+        [{ "node": "Create Person", "type": "main", "index": 0 }]
+      ]
+    },
+    "Search Attio Company": {
+      "main": [[{ "node": "Company Exists?", "type": "main", "index": 0 }]]
+    },
+    "Company Exists?": {
+      "main": [
+        [{ "node": "Get Existing Company ID", "type": "main", "index": 0 }],
+        [{ "node": "Create Company", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Existing Company ID": {
+      "main": [[{ "node": "Create Person", "type": "main", "index": 0 }]]
+    },
+    "Create Company": {
+      "main": [[{ "node": "Add Company to List", "type": "main", "index": 0 }]]
+    },
+    "Add Company to List": {
+      "main": [[{ "node": "Get New Company ID", "type": "main", "index": 0 }]]
+    },
+    "Get New Company ID": {
+      "main": [[{ "node": "Create Person", "type": "main", "index": 0 }]]
+    },
+    "Create Person": {
+      "main": [[{ "node": "Add Person to List", "type": "main", "index": 0 }]]
+    },
+    "Add Person to List": {
+      "main": [[{ "node": "Add Note (New Lead)", "type": "main", "index": 0 }]]
+    },
+    "Add Note (New Lead)": {
+      "main": [[{ "node": "Slack: New Lead", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true,
+    "errorWorkflow": "VeLfTAsiKygYKCkZ"
+  }
+}

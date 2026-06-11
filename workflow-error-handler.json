@@ -1,0 +1,61 @@
+{
+  "name": "Workflow Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "mode": "id",
+          "value": "UNGG09PRC"
+        },
+        "text": "=:rotating_light: *Workflow Error: {{ $json.workflow.name }}*\n\n*Failed node:* {{ $json.execution.lastNodeExecuted }}\n*Error:* {{ $json.execution.error.message }}\n*Mode:* {{ $json.execution.mode }}\n\n<{{ $json.execution.url }}|View Execution>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "slack-error-dm",
+      "name": "Slack DM: Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [288, 0],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "26HMtp3bs8XtDn08",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Workflow Error Handler\n\nShared error workflow. Any workflow with **Settings → Error Workflow** pointed here will send a Slack DM to Robby when an execution fails.\n\nPayload comes from the Error Trigger: `workflow.name`, `execution.lastNodeExecuted`, `execution.error.message`, `execution.url`.",
+        "height": 260,
+        "width": 320,
+        "color": 3
+      },
+      "id": "sticky-error",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-96, -192]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Slack DM: Error Alert", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

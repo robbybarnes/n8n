@@ -16,6 +16,8 @@ This repository contains n8n workflow automations built with AI assistance. Work
 | `betterstack-zendesk-receiver.json` | Betterstack → Zendesk Receiver | Real-time webhook receiver for Betterstack incidents; creates/updates Zendesk tickets, calls resolve sub-workflow | `hRNmqEHzL1597PVn` | Active |
 | `betterstack-zendesk-poller.json` | Betterstack → Zendesk Poller | 5-min polling reconciler that catches missed resolution webhooks via Betterstack API | `rlZaQdC4uMnoOY5v` | Active |
 | `betterstack-zendesk-resolve.json` | Betterstack Resolve Sub-workflow | Shared resolution logic; idempotent via `betterstack-resolved` tag | `FXjwcoWpPhmv76ws` | Active |
+| `contact-form-router.json` | Contact Form Router | 215.tech contact form webhook (requires `X-Webhook-Secret` header from www-215-tech Worker); AI spam filter (Claude Haiku via OpenRouter), routes to Zendesk (customer org/user match) or Attio (lead, person linked to company), notifies #sales | `LNkz9iPVpa3xDDf6` | Active |
+| `workflow-error-handler.json` | Workflow Error Handler | Shared error workflow — Slack DM to Robby on any failure; set as Error Workflow in other workflows' settings | `VeLfTAsiKygYKCkZ` | Active |
 
 ### Workflow File Conventions
 
@@ -405,6 +407,23 @@ Use the same four-parameter format:
 20. **n8n-nodes-base.executeWorkflowTrigger** - Sub-workflow calls
 
 **Note:** LangChain nodes use the `@n8n/n8n-nodes-langchain.` prefix, core nodes use `n8n-nodes-base.`
+
+---
+
+## API Gotchas (learned the hard way)
+
+### Attio (api.attio.com/v2)
+- **Upsert (`PUT /objects/{obj}/records`)**: `matching_attribute` MUST be a **query parameter**, not in the JSON body. In the body it's silently ignored and the API returns 400 `Query params validation error`.
+- **List entries (`POST /lists/{id}/entries`)**: `data.entry_values` is **required** even if empty (`{}`). Omitting it returns 400.
+- **Person→company linking**: set explicitly via `company: [{ target_object: 'companies', target_record_id: '<id>' }]`. Attio also auto-links by email domain (system actor) when a company with a matching domain exists, but don't rely on it — it fails for free-mail domains.
+- **Empty arrays in PUT assert values clear the attribute** — only include keys (e.g. `phone_numbers`) when you have a value.
+
+### Zendesk (215.zendesk.com/api/v2)
+- **Search CANNOT query organizations by domain** — `type:organization domain:x` and `domain_names:x` both return 0 results even for exact matches (verified empirically). To match an email domain to an org, list `/organizations.json` (paginated, ~116 orgs) and match `domain_names` client-side.
+- User search supports `query=email:<address>` for exact email matching.
+
+### n8n HTTP Request nodes
+- `neverError: true` masks 4xx/5xx as success — avoid it; let nodes fail and set a workflow-level Error Workflow (`Workflow Error Handler`, ID `VeLfTAsiKygYKCkZ`) instead.
 
 ---
 

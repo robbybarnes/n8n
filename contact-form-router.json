@@ -222,7 +222,7 @@
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
+        "authentication": "accessToken",
         "select": "channel",
         "channelId": { "__rl": true, "mode": "name", "value": "sales" },
         "text": "=:wastebasket: *Contact form submission filtered as spam*\n\n*From:* {{ $('Prepare Data').item.json.name }} ({{ $('Prepare Data').item.json.email }})\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Reason:* {{ $json.reason }}\n\n_No ticket or CRM record was created. If this looks like a real lead, check the execution history._",
@@ -244,9 +244,9 @@
       "position": [1344, 112],
       "webhookId": "spam-filtered-notify",
       "credentials": {
-        "slackOAuth2Api": {
-          "id": "26HMtp3bs8XtDn08",
-          "name": "Slack account"
+        "slackApi": {
+          "id": "qdmS9D0GZ3iZcYJt",
+          "name": "Slack Rob Clawdster Bot"
         }
       }
     },
@@ -346,7 +346,7 @@
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
+        "authentication": "accessToken",
         "select": "channel",
         "channelId": { "__rl": true, "mode": "name", "value": "sales" },
         "text": "=:ticket: *Contact Form from Existing Customer* ({{ $('Match Org by Domain').item.json.orgName }})\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n<https://215.zendesk.com/agent/tickets/{{ $json.ticket.id }}|Zendesk Ticket #{{ $json.ticket.id }}>",
@@ -368,9 +368,9 @@
       "position": [2240, 240],
       "webhookId": "customer-org-notify",
       "credentials": {
-        "slackOAuth2Api": {
-          "id": "26HMtp3bs8XtDn08",
-          "name": "Slack account"
+        "slackApi": {
+          "id": "qdmS9D0GZ3iZcYJt",
+          "name": "Slack Rob Clawdster Bot"
         }
       }
     },
@@ -454,7 +454,7 @@
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
+        "authentication": "accessToken",
         "select": "channel",
         "channelId": { "__rl": true, "mode": "name", "value": "sales" },
         "text": "=:ticket: *Contact Form from Known Zendesk User*\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n<https://215.zendesk.com/agent/tickets/{{ $json.ticket.id }}|Zendesk Ticket #{{ $json.ticket.id }}>",
@@ -476,9 +476,9 @@
       "position": [2688, 432],
       "webhookId": "customer-user-notify",
       "credentials": {
-        "slackOAuth2Api": {
-          "id": "26HMtp3bs8XtDn08",
-          "name": "Slack account"
+        "slackApi": {
+          "id": "qdmS9D0GZ3iZcYJt",
+          "name": "Slack Rob Clawdster Bot"
         }
       }
     },
@@ -596,7 +596,7 @@
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
+        "authentication": "accessToken",
         "select": "channel",
         "channelId": { "__rl": true, "mode": "name", "value": "sales" },
         "text": "=:incoming_envelope: *Existing Contact - Contact Form Submission*\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n_This person is already in Attio. Note added to their record._",
@@ -618,9 +618,9 @@
       "position": [3360, 624],
       "webhookId": "1d631d65-514c-4d88-8cf9-3f89ccdb7b07",
       "credentials": {
-        "slackOAuth2Api": {
-          "id": "26HMtp3bs8XtDn08",
-          "name": "Slack account"
+        "slackApi": {
+          "id": "qdmS9D0GZ3iZcYJt",
+          "name": "Slack Rob Clawdster Bot"
         }
       }
     },
@@ -882,7 +882,7 @@
     },
     {
       "parameters": {
-        "authentication": "oAuth2",
+        "authentication": "accessToken",
         "select": "channel",
         "channelId": { "__rl": true, "mode": "name", "value": "sales" },
         "text": "=:sparkles: *New Lead from Contact Form!*\n\n*Name:* {{ $('Prepare Data').item.json.name }}\n*Email:* {{ $('Prepare Data').item.json.email }}\n*Company:* {{ $('Prepare Data').item.json.company }}\n*Phone:* {{ $('Prepare Data').item.json.phone }}\n\n*Message:*\n> {{ $('Prepare Data').item.json.message }}\n\n_Added to Attio as a new lead._",
@@ -904,9 +904,9 @@
       "position": [4928, 1008],
       "webhookId": "907b082b-acb8-40d8-8615-296ea8ddd0dd",
       "credentials": {
-        "slackOAuth2Api": {
-          "id": "26HMtp3bs8XtDn08",
-          "name": "Slack account"
+        "slackApi": {
+          "id": "qdmS9D0GZ3iZcYJt",
+          "name": "Slack Rob Clawdster Bot"
         }
       }
     },

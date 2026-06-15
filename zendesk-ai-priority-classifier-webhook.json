@@ -33,6 +33,15 @@
                 "type": "boolean",
                 "operation": "equals"
               }
+            },
+            {
+              "id": "check-vip",
+              "leftValue": "={{ !$json.body.detail.tags.some(t => ['vip', 'vip_crewai'].includes(t)) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         },
@@ -92,7 +101,7 @@
     },
     {
       "parameters": {
-        "content": "## Zendesk AI Priority Classifier (Webhook)\n\n**Purpose**: Automatically classify new Zendesk tickets by priority using Claude Sonnet 4.5 via OpenRouter\n\n**Webhook URL**: https://twofifteen.app.n8n.cloud/webhook/zendesk-new-ticket\n\n**How it works**:\n1. Zendesk sends webhook with ticket data on new ticket\n2. Checks if ticket already has 'ai-priority-set' tag\n3. Sends ticket subject/description to Claude (via OpenRouter) for analysis\n4. Updates ticket priority and adds internal note\n\n**Data Path**: Ticket data is at `$json.body.detail.*`\n\n**Note**: Uses ticket data directly from webhook payload (no separate API call)",
+        "content": "## Zendesk AI Priority Classifier (Webhook)\n\n**Purpose**: Automatically classify new Zendesk tickets by priority using Claude Sonnet 4.5 via OpenRouter\n\n**Webhook URL**: https://twofifteen.app.n8n.cloud/webhook/zendesk-new-ticket\n\n**How it works**:\n1. Zendesk sends webhook with ticket data on new ticket\n2. Skips tickets that already have the 'ai-priority-set' tag OR a VIP tag ('vip' / 'vip_crewai') — VIP tickets are escalated by the Zendesk 'VIP: prioritize VIP tickets' trigger, so the AI classifier must not overwrite their priority\n3. Sends ticket subject/description to Claude (via OpenRouter) for analysis\n4. Updates ticket priority and adds internal note\n\n**Data Path**: Ticket data is at `$json.body.detail.*`\n\n**Note**: Uses ticket data directly from webhook payload (no separate API call)",
         "height": 864,
         "width": 288
       },
@@ -104,7 +113,7 @@
     },
     {
       "parameters": {
-        "model": "anthropic/claude-sonnet-4.5",
+        "model": "anthropic/claude-sonnet-latest",
         "options": {}
       },
       "id": "openrouter-model",

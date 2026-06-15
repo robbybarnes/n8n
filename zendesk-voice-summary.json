@@ -146,7 +146,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"google/gemini-2.5-flash\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Please transcribe this audio file accurately. Include speaker labels if you can identify different speakers (e.g., Agent: and Customer:).\"\n        },\n        {\n          \"type\": \"input_audio\",\n          \"inputAudio\": {\n            \"data\": \"{{ $json.base64Audio }}\",\n            \"format\": \"{{ $json.audioFormat }}\"\n          }\n        }\n      ]\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"google/gemini-flash-latest\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Please transcribe this audio file accurately. Include speaker labels if you can identify different speakers (e.g., Agent: and Customer:).\"\n        },\n        {\n          \"type\": \"input_audio\",\n          \"inputAudio\": {\n            \"data\": \"{{ $json.base64Audio }}\",\n            \"format\": \"{{ $json.audioFormat }}\"\n          }\n        }\n      ]\n    }\n  ]\n}",
         "options": {}
       }
     },

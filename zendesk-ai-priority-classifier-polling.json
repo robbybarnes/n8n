@@ -59,6 +59,15 @@
                 "type": "boolean",
                 "operation": "equals"
               }
+            },
+            {
+              "id": "check-vip",
+              "leftValue": "={{ !$json.tags.some(t => ['vip', 'vip_crewai'].includes(t)) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -66,15 +75,16 @@
     },
     {
       "id": "anthropic-model",
-      "name": "Claude Sonnet 4.5",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
       "position": [660, 200],
       "parameters": {
-        "model": {"mode": "id", "value": "claude-sonnet-4-5-20250929"}
+        "model": "anthropic/claude-sonnet-latest",
+        "options": {}
       },
       "credentials": {
-        "anthropicApi": {"id": "anthropic", "name": "Anthropic account"}
+        "openRouterApi": {"id": "9Cpj8UNSpHEq0gYe", "name": "OpenRouter account"}
       }
     },
     {
@@ -131,7 +141,7 @@
       "typeVersion": 1,
       "position": [-200, -150],
       "parameters": {
-        "content": "## Zendesk AI Priority Classifier (Polling)\n\n**Purpose**: Automatically classify new Zendesk tickets by priority using Claude Sonnet 4.5\n\n**How it works**:\n1. Runs every 2 minutes to check for new tickets\n2. Filters tickets that don't have the 'ai-priority-set' tag\n3. Sends ticket subject + description to Claude for analysis\n4. Updates the ticket's priority field, adds the tag, and adds an internal note\n\n**Why polling?**: More reliable than webhooks on Cloud Run (no ephemeral instance issues)\n\n**Priority Guidelines**:\n- **Urgent**: System down, security breach, data loss, revenue impact\n- **High**: Major feature broken, workflow blocked\n- **Normal**: Issue with workaround, general questions\n- **Low**: Cosmetic issues, feature requests"
+        "content": "## Zendesk AI Priority Classifier (Polling)\n\n**Purpose**: Automatically classify new Zendesk tickets by priority using Claude Sonnet 4.5\n\n**How it works**:\n1. Runs every 2 minutes to check for new tickets\n2. Filters tickets that don't have the 'ai-priority-set' tag and don't have a VIP tag ('vip' / 'vip_crewai') — VIP tickets are escalated by the Zendesk 'VIP: prioritize VIP tickets' trigger, so the AI classifier must not overwrite their priority\n3. Sends ticket subject + description to Claude for analysis\n4. Updates the ticket's priority field, adds the tag, and adds an internal note\n\n**Why polling?**: More reliable than webhooks on Cloud Run (no ephemeral instance issues)\n\n**Priority Guidelines**:\n- **Urgent**: System down, security breach, data loss, revenue impact\n- **High**: Major feature broken, workflow blocked\n- **Normal**: Issue with workaround, general questions\n- **Low**: Cosmetic issues, feature requests"
       }
     }
   ],
@@ -145,7 +155,7 @@
     "Not Yet Processed?": {
       "main": [[{"node": "Classify Priority", "type": "main", "index": 0}]]
     },
-    "Claude Sonnet 4.5": {
+    "OpenRouter Chat Model": {
       "ai_languageModel": [[{"node": "Classify Priority", "type": "ai_languageModel", "index": 0}]]
     },
     "Classify Priority": {

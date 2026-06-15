@@ -168,7 +168,7 @@
     },
     {
       "parameters": {
-        "model": "anthropic/claude-haiku-4.5",
+        "model": "anthropic/claude-haiku-latest",
         "options": {}
       },
       "id": "openrouter-spam-model",

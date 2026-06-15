@@ -28,20 +28,18 @@
     },
     {
       "id": "anthropic-model",
-      "name": "Claude Sonnet 4.5",
-      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
-      "typeVersion": 1.3,
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
       "position": [220, 200],
       "parameters": {
-        "model": {
-          "mode": "id",
-          "value": "claude-sonnet-4-5-20250929"
-        }
+        "model": "anthropic/claude-sonnet-latest",
+        "options": {}
       },
       "credentials": {
-        "anthropicApi": {
-          "id": "anthropic",
-          "name": "Anthropic account"
+        "openRouterApi": {
+          "id": "9Cpj8UNSpHEq0gYe",
+          "name": "OpenRouter account"
         }
       }
     },
@@ -118,7 +116,7 @@
         ]
       ]
     },
-    "Claude Sonnet 4.5": {
+    "OpenRouter Chat Model": {
       "ai_languageModel": [
         [
           {

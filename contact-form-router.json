@@ -156,7 +156,7 @@
           ]
         },
         "options": {
-          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists, attendee lists, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
+          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists or contact/attendee databases, lead-generation, demand-generation, appointment-setting or 'fill your sales pipeline' offers, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nIMPORTANT: Any message offering to sell, generate, or deliver leads, prospects, or sales appointments — including pitches that name-drop other clients they have helped or promise '15-minute calls' — is spam, even when polite or addressed to us by name.\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
         }
       },
       "id": "classify-spam",
@@ -168,7 +168,7 @@
     },
     {
       "parameters": {
-        "model": "anthropic/claude-haiku-latest",
+        "model": "anthropic/claude-haiku-4.5",
         "options": {}
       },
       "id": "openrouter-spam-model",
@@ -185,13 +185,95 @@
     },
     {
       "parameters": {
-        "jsCode": "// Fail open: if the classifier failed or returned garbage, treat as NOT spam\n// so a legitimate lead is never silently dropped.\nconst item = $input.first().json;\nlet spam = false;\nlet reason = 'classifier unavailable - failed open';\ntry {\n  const out = item.output || {};\n  spam = out.spam === true || String(out.spam).toLowerCase().trim() === 'true';\n  if (out.reason !== undefined) reason = String(out.reason);\n} catch (e) { /* fail open */ }\nreturn [{ json: { spam, reason } }];"
+        "jsCode": "// Parse the primary classifier. Sets `failed` so the workflow can try the\n// fallback model before giving up. Does NOT fail open here — that only happens\n// after the fallback also fails (see Parse Spam Verdict (Fallback)).\nconst item = $input.first().json;\nlet spam = false;\nlet failed = false;\nlet reason = 'classifier unavailable';\ntry {\n  const out = item.output || {};\n  if (item.error !== undefined || out.spam === undefined) {\n    failed = true;\n  } else {\n    spam = out.spam === true || String(out.spam).toLowerCase().trim() === 'true';\n    if (out.reason !== undefined) reason = String(out.reason);\n  }\n} catch (e) { failed = true; }\nreturn [{ json: { spam, reason, failed } }];"
       },
       "id": "parse-spam-verdict",
       "name": "Parse Spam Verdict",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [896, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-needs-fallback",
+              "leftValue": "={{ $json.failed }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-needs-fallback",
+      "name": "Needs Fallback?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1040, 304]
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-3.5-flash",
+        "options": {}
+      },
+      "id": "openrouter-fallback-model",
+      "name": "OpenRouter Fallback Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [1040, 656],
+      "credentials": {
+        "openRouterApi": {
+          "id": "9Cpj8UNSpHEq0gYe",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=Name: {{ $('Prepare Data').item.json.name }}\nEmail: {{ $('Prepare Data').item.json.email }}\nCompany: {{ $('Prepare Data').item.json.company }}\nPhone: {{ $('Prepare Data').item.json.phone }}\nMessage:\n{{ $('Prepare Data').item.json.message }}",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "spam",
+              "description": "MUST be exactly the lowercase string 'true' if the submission is spam, or 'false' if it is legitimate.",
+              "required": true
+            },
+            {
+              "name": "reason",
+              "description": "A brief one-sentence explanation of why the submission was classified as spam or legitimate.",
+              "required": true
+            }
+          ]
+        },
+        "options": {
+          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists or contact/attendee databases, lead-generation, demand-generation, appointment-setting or 'fill your sales pipeline' offers, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nIMPORTANT: Any message offering to sell, generate, or deliver leads, prospects, or sales appointments — including pitches that name-drop other clients they have helped or promise '15-minute calls' — is spam, even when polite or addressed to us by name.\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
+        }
+      },
+      "id": "classify-spam-fallback",
+      "name": "Classify Spam (Fallback)",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [1040, 480],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Terminal parse for the fallback classifier. If this also failed, fail OPEN\n// (treat as NOT spam) so a legitimate lead is never silently dropped.\nconst item = $input.first().json;\nlet spam = false;\nlet reason = 'classifier unavailable (primary + fallback) - failed open';\ntry {\n  const out = item.output || {};\n  if (item.error === undefined && out.spam !== undefined) {\n    spam = out.spam === true || String(out.spam).toLowerCase().trim() === 'true';\n    if (out.reason !== undefined) reason = String(out.reason) + ' (fallback model)';\n  }\n} catch (e) { /* fail open */ }\nreturn [{ json: { spam, reason, failed: false } }];"
+      },
+      "id": "parse-spam-verdict-fallback",
+      "name": "Parse Spam Verdict (Fallback)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1264, 480]
     },
     {
       "parameters": {
@@ -999,6 +1081,21 @@
       "ai_languageModel": [[{ "node": "Classify Spam", "type": "ai_languageModel", "index": 0 }]]
     },
     "Parse Spam Verdict": {
+      "main": [[{ "node": "Needs Fallback?", "type": "main", "index": 0 }]]
+    },
+    "Needs Fallback?": {
+      "main": [
+        [{ "node": "Classify Spam (Fallback)", "type": "main", "index": 0 }],
+        [{ "node": "Is Spam?", "type": "main", "index": 0 }]
+      ]
+    },
+    "OpenRouter Fallback Model": {
+      "ai_languageModel": [[{ "node": "Classify Spam (Fallback)", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Classify Spam (Fallback)": {
+      "main": [[{ "node": "Parse Spam Verdict (Fallback)", "type": "main", "index": 0 }]]
+    },
+    "Parse Spam Verdict (Fallback)": {
       "main": [[{ "node": "Is Spam?", "type": "main", "index": 0 }]]
     },
     "Is Spam?": {

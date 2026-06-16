@@ -113,7 +113,7 @@
     },
     {
       "parameters": {
-        "model": "anthropic/claude-sonnet-latest",
+        "model": "anthropic/claude-sonnet-4.6",
         "options": {}
       },
       "id": "openrouter-model",

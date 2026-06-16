@@ -80,7 +80,7 @@
       "typeVersion": 1,
       "position": [660, 200],
       "parameters": {
-        "model": "anthropic/claude-sonnet-latest",
+        "model": "anthropic/claude-sonnet-4.6",
         "options": {}
       },
       "credentials": {

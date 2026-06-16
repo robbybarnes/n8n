@@ -425,6 +425,10 @@ Use the same four-parameter format:
 ### n8n HTTP Request nodes
 - `neverError: true` masks 4xx/5xx as success — avoid it; let nodes fail and set a workflow-level Error Workflow (`Workflow Error Handler`, ID `VeLfTAsiKygYKCkZ`) instead.
 
+### OpenRouter models (`lmChatOpenRouter` node)
+- **`-latest` aliases do NOT work** (OpenRouter-side, not an n8n quirk). Slugs like `anthropic/claude-sonnet-latest`, `anthropic/claude-haiku-latest`, `google/gemini-flash-latest` return HTTP 400 `Bad request` in n8n. Confirmed independent of n8n via raw `curl`: `https://openrouter.ai/api/v1/models/{author}/{slug}/endpoints` returns **404 Not Found** for the `-latest` slugs but lists real serving endpoints for concrete slugs. They have website pages (`openrouter.ai/~author/slug`, "$0/$0", "always redirects to the latest…") but resolve to zero endpoints. Only the **native Anthropic/Google APIs** support `-latest`; OpenRouter the aggregator needs concrete slugs (e.g. `anthropic/claude-haiku-4.5`, `anthropic/claude-sonnet-4.6`, `google/gemini-3.5-flash`). The `~` is a UI URL prefix only — never put it in the model field. **Verify any slug** with `curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints` before deploying.
+- **The Information Extractor masks the 400** as `{error:...}` output, so a bad model slug fails *silently* (e.g. spam classifier fails open). Test the actual execution, don't trust deploy success.
+
 ---
 
 ## n8n Node Data Structure Notes

@@ -14,9 +14,11 @@ This repository contains n8n workflow automations built with AI assistance. Work
 | `zendesk-ai-priority-classifier-polling.json` | Zendesk AI Priority Classifier (Polling) | Polls every 2 min for new tickets (fallback if webhooks unavailable) | N/A | Backup |
 | `zendesk-voice-summary.json` | Zendesk Voice Call Summary | Webhook-triggered: transcribes phone call recordings via OpenRouter (Gemini 2.5 Flash), summarizes, posts as private comment | `h0VuVi8v9Y4hGoz1` | Inactive |
 | `betterstack-zendesk-receiver.json` | Betterstack → Zendesk Receiver | Real-time webhook receiver for Betterstack incidents; creates/updates Zendesk tickets, calls resolve sub-workflow | `hRNmqEHzL1597PVn` | Active |
-| `betterstack-zendesk-poller.json` | Betterstack → Zendesk Poller | 5-min polling reconciler that catches missed resolution webhooks via Betterstack API | `rlZaQdC4uMnoOY5v` | Active |
+| `betterstack-zendesk-poller.json` | Betterstack → Zendesk Poller | 30-min polling reconciler that catches missed resolution webhooks via Betterstack API (straggler tickets still get full outage-time calc; longer interval only delays reconciliation) | `rlZaQdC4uMnoOY5v` | Active |
 | `betterstack-zendesk-resolve.json` | Betterstack Resolve Sub-workflow | Shared resolution logic; idempotent via `betterstack-resolved` tag | `FXjwcoWpPhmv76ws` | Active |
 | `contact-form-router.json` | Contact Form Router | 215.tech contact form webhook (requires `X-Webhook-Secret` header from www-215-tech Worker); AI spam filter (Claude Haiku via OpenRouter), routes to Zendesk (customer org/user match) or Attio (lead, person linked to company), notifies #sales | `LNkz9iPVpa3xDDf6` | Active |
+| `attio-google-tasks-sync-realtime.json` | Attio → Google Tasks (Ed) | Webhook-triggered: Attio `task.created`/`task.updated` → verify HMAC signature (`$vars.ATTIO_WEBHOOK_SECRET`), GET task, if assigned to Ed Lukacs upsert into his Google Tasks (mapping `attio:{id}` in notes). Completion NOT pushed. Loop guard drops own actor (`$vars.ATTIO_INTEGRATION_ACTOR_ID`, optional). | `5qgcO8GkcVGKNQkN` | Active |
+| `google-tasks-attio-completion-poller.json` | Google Tasks → Attio Completion (Ed) | Polls Ed's Google Tasks every 10 min (windowed via static data `lastPoll` + overlap); completed tasks tagged `attio:{id}` mark the matching Attio task complete (only if still open — idempotent). Reverse half of the Attio⇄Google Tasks sync. | `08LswD1ur94rQ9DM` | Active |
 | `workflow-error-handler.json` | Workflow Error Handler | Shared error workflow — Slack DM to Robby on any failure; set as Error Workflow in other workflows' settings | `VeLfTAsiKygYKCkZ` | Active |
 
 ### Workflow File Conventions
@@ -424,6 +426,12 @@ Use the same four-parameter format:
 
 ### n8n HTTP Request nodes
 - `neverError: true` masks 4xx/5xx as success — avoid it; let nodes fail and set a workflow-level Error Workflow (`Workflow Error Handler`, ID `VeLfTAsiKygYKCkZ`) instead.
+
+### n8n Cloud draft/publish versioning
+- This instance uses **draft vs. published versions**. `update_workflow` (and `n8n_update_partial_workflow`) save a new **draft** but do **NOT** change the active/running version — webhooks and triggers keep executing the old published code. After any edit to a live workflow, call **`publish_workflow({workflowId})`** to promote the draft, or the change silently has no effect. Diagnose via `get_workflow_details`: if `versionId !== activeVersionId`, there's an unpublished draft (compare the `nodes` block vs. the `activeVersion.nodes` block to see the stale code). Bit us once: a Code-node fix ran fine in the editor but the webhook kept rejecting events because the published version still had the old code.
+
+### n8n Code node + `$vars`
+- `$vars.<name>` reads n8n **Variables** by their exact key. Variable keys are case-sensitive and the UI tends to store them SCREAMING_SNAKE (e.g. `ATTIO_WEBHOOK_SECRET`, not `attioWebhookSecret`). A mismatch yields `undefined`, not an error — so secret-gated logic (e.g. HMAC verify) fails *closed and silently*. Confirm the exact key on the Variables page before referencing it.
 
 ### OpenRouter models (`lmChatOpenRouter` node)
 - **`-latest` aliases do NOT work** (OpenRouter-side, not an n8n quirk). Slugs like `anthropic/claude-sonnet-latest`, `anthropic/claude-haiku-latest`, `google/gemini-flash-latest` return HTTP 400 `Bad request` in n8n. Confirmed independent of n8n via raw `curl`: `https://openrouter.ai/api/v1/models/{author}/{slug}/endpoints` returns **404 Not Found** for the `-latest` slugs but lists real serving endpoints for concrete slugs. They have website pages (`openrouter.ai/~author/slug`, "$0/$0", "always redirects to the latest…") but resolve to zero endpoints. Only the **native Anthropic/Google APIs** support `-latest`; OpenRouter the aggregator needs concrete slugs (e.g. `anthropic/claude-haiku-4.5`, `anthropic/claude-sonnet-4.6`, `google/gemini-3.5-flash`). The `~` is a UI URL prefix only — never put it in the model field. **Verify any slug** with `curl -s https://openrouter.ai/api/v1/models/<author>/<slug>/endpoints` before deploying.

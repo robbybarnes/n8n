@@ -6,6 +6,7 @@
         "httpMethod": "POST",
         "path": "contact-form",
         "authentication": "headerAuth",
+        "responseMode": "onReceived",
         "options": {}
       },
       "id": "webhook-trigger",
@@ -28,6 +29,131 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [0, 512]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reads the Idempotency-Key header (fallback: body.submissionId — the sender\n// sets both to the same UUID v4). Dedup only applies when the key looks like a\n// UUID v4; a missing/malformed key means \"process normally, no dedup\".\nconst item = $input.first().json;\nconst headers = item.headers || {};\nconst raw = headers['idempotency-key'] || (item.body || {}).submissionId || '';\nconst key = String(raw).trim().toLowerCase();\nconst isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(key);\nreturn [{ json: Object.assign({}, item, { idempotencyKey: isUuid ? key : '', hasIdempotencyKey: isUuid }) }];"
+      },
+      "id": "extract-idempotency-key",
+      "name": "Extract Idempotency Key",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [176, 64]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-key",
+              "leftValue": "={{ $json.hasIdempotencyKey }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-idempotency-key",
+      "name": "Has Idempotency Key?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [368, 64]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "u6aRVICRQV9I6FEc",
+          "cachedResultName": "contact_form_idempotency"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            { "keyName": "idempotencyKey", "condition": "eq", "keyValue": "={{ $json.idempotencyKey }}" }
+          ]
+        }
+      },
+      "id": "check-new-key",
+      "name": "New Key?",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [560, 64]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "u6aRVICRQV9I6FEc",
+          "cachedResultName": "contact_form_idempotency"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "idempotencyKey": "={{ $json.idempotencyKey }}",
+            "receivedAt": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "idempotencyKey", "displayName": "idempotencyKey", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "receivedAt", "displayName": "receivedAt", "required": false, "defaultMatch": false, "display": true, "type": "dateTime", "canBeUsedToMatch": true }
+          ]
+        },
+        "options": {}
+      },
+      "id": "persist-idempotency-key",
+      "name": "Persist Idempotency Key",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [752, 64]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "u6aRVICRQV9I6FEc",
+          "cachedResultName": "contact_form_idempotency"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            { "keyName": "receivedAt", "condition": "lt", "keyValue": "={{ $now.minus({ hours: 48 }).toISO() }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "purge-old-keys",
+      "name": "Purge Old Keys",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [944, -112],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Data table nodes replace $json with the table row; downstream nodes expect\n// the original webhook payload shape.\nreturn [{ json: $('Extract Idempotency Key').first().json }];"
+      },
+      "id": "restore-webhook-payload",
+      "name": "Restore Webhook Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [944, 64]
     },
     {
       "parameters": {
@@ -156,7 +282,7 @@
           ]
         },
         "options": {
-          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists or contact/attendee databases, lead-generation, demand-generation, appointment-setting or 'fill your sales pipeline' offers, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nIMPORTANT: Any message offering to sell, generate, or deliver leads, prospects, or sales appointments — including pitches that name-drop other clients they have helped or promise '15-minute calls' — is spam, even when polite or addressed to us by name.\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
+          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists or contact/attendee databases, lead-generation, demand-generation, appointment-setting or 'fill your sales pipeline' offers, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nIMPORTANT: Any message offering to sell, generate, or deliver leads, prospects, or sales appointments — including pitches that name-drop other clients they have helped or promise '15-minute calls' — is spam, even when polite or addressed to us by name.\n\nIMPORTANT: Unsolicited requests for price quotes on hardware are spam (procurement fraud). Red flags: requests for quotations on laptops, desktops, servers, GPUs, networking gear, phones, or toner; detailed specification lists; bulk quantities (e.g. '20 laptops'); per-unit budget ranges; asking to 'confirm stock availability'; net-30 or credit terms; shipping/freight details. These are scams even when sent from a business domain with a professional signature, and they never reference 2Fifteen Tech's actual services or an existing relationship. Only treat a hardware request as legitimate if it clearly comes from an existing 2Fifteen Tech client relationship (references their account, ongoing services, or a 2Fifteen contact by name).\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
         }
       },
       "id": "classify-spam",
@@ -255,7 +381,7 @@
           ]
         },
         "options": {
-          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists or contact/attendee databases, lead-generation, demand-generation, appointment-setting or 'fill your sales pipeline' offers, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nIMPORTANT: Any message offering to sell, generate, or deliver leads, prospects, or sales appointments — including pitches that name-drop other clients they have helped or promise '15-minute calls' — is spam, even when polite or addressed to us by name.\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
+          "systemPromptTemplate": "You are a spam filter for the website contact form of 2Fifteen Tech, a managed IT services provider (MSP) in Utah. Classify each submission as spam or legitimate.\n\nSpam includes: unsolicited sales pitches and cold outreach (cleaning services, lead lists or contact/attendee databases, lead-generation, demand-generation, appointment-setting or 'fill your sales pipeline' offers, SEO or marketing offers, link building, staffing or outsourcing pitches), mass-mailed templates, and anything with opt-out language like 'reply STOP' or 'REMOVE'.\n\nIMPORTANT: Any message offering to sell, generate, or deliver leads, prospects, or sales appointments — including pitches that name-drop other clients they have helped or promise '15-minute calls' — is spam, even when polite or addressed to us by name.\n\nIMPORTANT: Unsolicited requests for price quotes on hardware are spam (procurement fraud). Red flags: requests for quotations on laptops, desktops, servers, GPUs, networking gear, phones, or toner; detailed specification lists; bulk quantities (e.g. '20 laptops'); per-unit budget ranges; asking to 'confirm stock availability'; net-30 or credit terms; shipping/freight details. These are scams even when sent from a business domain with a professional signature, and they never reference 2Fifteen Tech's actual services or an existing relationship. Only treat a hardware request as legitimate if it clearly comes from an existing 2Fifteen Tech client relationship (references their account, ongoing services, or a 2Fifteen contact by name).\n\nLegitimate includes: genuine inquiries about IT services or support, questions from existing or prospective clients, and vendor or partner inquiries that specifically reference 2Fifteen Tech or its services.\n\nWhen uncertain, prefer legitimate."
         }
       },
       "id": "classify-spam-fallback",
@@ -994,7 +1120,7 @@
     },
     {
       "parameters": {
-        "content": "## Contact Form Router\n\n**Webhook**: POST /webhook/contact-form (requires `X-Webhook-Secret` header — sent by the www-215-tech Cloudflare Worker)\n\nPipeline:\n1. **Validate** — drop submissions without a parseable email\n2. **Spam filter** — Claude Haiku via OpenRouter classifies; spam gets a :wastebasket: Slack note only (fails open if classifier is down)\n3. **Zendesk Org Match** — email domain matched against org `domain_names` (client-side; Zendesk search can't query domains) → ticket linked to org\n4. **Zendesk User Match** — known user → ticket\n5. **Existing Attio Contact** — upsert person, add note, notify #sales\n6. **New Lead** — find/create company (business domains only), create person *linked to company*, add both to lead lists, note, notify #sales\n\nErrors go to the **Workflow Error Handler** (Slack DM to Robby).",
+        "content": "## Contact Form Router\n\n**Webhook**: POST /webhook/contact-form (requires `X-Webhook-Secret` header — sent by the www-215-tech Cloudflare Worker). Responds 200 immediately (`onReceived`), so the sender retries only on network failure/timeout.\n\nPipeline:\n1. **Idempotency** — `Idempotency-Key` header (= `submissionId`, UUID v4) looked up in Data Table `contact_form_idempotency`; duplicates stop before any side effect; new keys persisted FIRST; 48 h retention\n2. **Validate** — drop submissions without a parseable email\n3. **Spam filter** — Claude Haiku via OpenRouter classifies (incl. hardware-RFQ procurement scams); spam gets a :wastebasket: Slack note only (fails open if classifier is down)\n4. **Zendesk Org Match** — email domain matched against org `domain_names` (client-side; Zendesk search can't query domains) → ticket linked to org\n5. **Zendesk User Match** — known user → ticket\n6. **Existing Attio Contact** — upsert person, add note, notify #sales\n7. **New Lead** — find/create company (business domains only), create person *linked to company*, add both to lead lists, note, notify #sales\n\nErrors go to the **Workflow Error Handler** (Slack DM to Robby).",
         "height": 460,
         "width": 360,
         "color": 7
@@ -1056,10 +1182,44 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [3504, 700]
+    },
+    {
+      "parameters": {
+        "content": "## Idempotency Dedup\n\nSender retries with the SAME `Idempotency-Key` (UUID v4, = `body.submissionId`) on timeout/5xx; users resubmitting after an error reuse it too.\n\n- Key persisted in Data Table `contact_form_idempotency` BEFORE any side effect\n- Duplicate key → flow stops at `New Key?` (webhook already answered 200, so duplicates return 200)\n- Missing / non-UUID key → processed normally, no dedup\n- Keys older than 48 h purged on each new submission\n- If a side effect fails AFTER the key persisted: key stays persisted — no duplicate is possible on retry/resubmit; the Error Workflow DMs Robby so the lost lead is handled manually",
+        "height": 320,
+        "width": 560,
+        "color": 2
+      },
+      "id": "sticky-idempotency",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [128, -336]
     }
   ],
   "connections": {
     "Contact Form Webhook": {
+      "main": [[{ "node": "Extract Idempotency Key", "type": "main", "index": 0 }]]
+    },
+    "Extract Idempotency Key": {
+      "main": [[{ "node": "Has Idempotency Key?", "type": "main", "index": 0 }]]
+    },
+    "Has Idempotency Key?": {
+      "main": [
+        [{ "node": "New Key?", "type": "main", "index": 0 }],
+        [{ "node": "Prepare Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "New Key?": {
+      "main": [[{ "node": "Persist Idempotency Key", "type": "main", "index": 0 }]]
+    },
+    "Persist Idempotency Key": {
+      "main": [[
+        { "node": "Restore Webhook Payload", "type": "main", "index": 0 },
+        { "node": "Purge Old Keys", "type": "main", "index": 0 }
+      ]]
+    },
+    "Restore Webhook Payload": {
       "main": [[{ "node": "Prepare Data", "type": "main", "index": 0 }]]
     },
     "Manual Trigger": {
